@@ -1,7 +1,5 @@
-package BIOfid.Run;
+package org.texttechnologylab.uima.conll.run;
 
-import BIOfid.Extraction.ConllBIO2003Writer;
-import de.tudarmstadt.ukp.dkpro.core.io.xmi.XmiReader;
 import org.apache.commons.cli.*;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -11,10 +9,12 @@ import org.apache.uima.collection.CollectionReader;
 import org.apache.uima.fit.factory.AnalysisEngineFactory;
 import org.apache.uima.fit.factory.CollectionReaderFactory;
 import org.apache.uima.fit.pipeline.SimplePipeline;
-import org.biofid.agreement.engine.TTLabUnitizingIAACollectionProcessingEngine;
+import org.dkpro.core.io.xmi.XmiReader;
+import org.texttechnologylab.agreement.engine.TTLabUnitizingIAACollectionProcessingEngine;
 import org.texttechnologylab.annotation.AbstractNamedEntity;
 import org.texttechnologylab.annotation.NamedEntity;
 import org.texttechnologylab.utilities.uima.reader.TextAnnotatorRepositoryCollectionReader;
+import org.texttechnologylab.uima.conll.extractor.ConllBIO2003Writer;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,10 +31,12 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static org.texttechnologylab.agreement.engine.AbstractIAAEngine.*;
+
 /**
  * Created on 12.12.19.
  */
-public class BIOfidColumnDatasetExtract {
+public class ExtractBIOfidColumnDataset {
 	public static void main(String[] args) {
 		Options options = new Options();
 		options.addOption("h", "Print this message.");
@@ -130,14 +132,14 @@ public class BIOfidColumnDatasetExtract {
 			
 			if (minIaaScore > 0.0) {
 				final AnalysisEngine agreementEngine = AnalysisEngineFactory.createEngine(TTLabUnitizingIAACollectionProcessingEngine.class,
-						TTLabUnitizingIAACollectionProcessingEngine.PARAM_ANNOTATOR_LIST, annotatorWhitelist,
-						TTLabUnitizingIAACollectionProcessingEngine.PARAM_ANNOTATOR_RELATION, whitelist,
-						TTLabUnitizingIAACollectionProcessingEngine.PARAM_MULTI_CAS_HANDLING, TTLabUnitizingIAACollectionProcessingEngine.SEPARATE,
-						TTLabUnitizingIAACollectionProcessingEngine.PARAM_PRINT_STATS, false,
-						TTLabUnitizingIAACollectionProcessingEngine.PARAM_MIN_VIEWS, 2,
-						TTLabUnitizingIAACollectionProcessingEngine.PARAM_MIN_ANNOTATIONS, 0,
-						TTLabUnitizingIAACollectionProcessingEngine.PARAM_ANNOTATE_DOCUMENT, true,
-						TTLabUnitizingIAACollectionProcessingEngine.PARAM_ANNOTATION_CLASSES, new String[]{NamedEntity.class.getName(), AbstractNamedEntity.class.getName()}
+						PARAM_ANNOTATOR_LIST, annotatorWhitelist,
+						PARAM_ANNOTATOR_RELATION, whitelist,
+						PARAM_MULTI_CAS_HANDLING, SEPARATE,
+						PARAM_PRINT_STATS, false,
+						PARAM_MIN_VIEWS, 2,
+						PARAM_MIN_ANNOTATIONS, 0,
+						PARAM_ANNOTATE_DOCUMENT, true,
+						PARAM_ANNOTATION_CLASSES, new String[]{NamedEntity.class.getName(), AbstractNamedEntity.class.getName()}
 				);
 				
 				SimplePipeline.runPipeline(reader, agreementEngine, conllEngine);
@@ -195,7 +197,7 @@ public class BIOfidColumnDatasetExtract {
 	private static void printHelp(Options options) {
 		HelpFormatter helpFormatter = new HelpFormatter();
 		helpFormatter.printHelp(
-				"java -cp $CLASSPATH BIOfid.Run.BIOfidColumnDatasetExtract -i $XMI_PATH -o $CONLL_PATH -ids [$ANNOTATOR_IDS] [args]",
+				"java -cp $CLASSPATH BIOfidColumnDatasetExtract -i $XMI_PATH -o $CONLL_PATH -ids [$ANNOTATOR_IDS] [args]",
 				"Reads a list of XMIs or fetch a repository from the TextAnnotator and convert them to CoNLL BIO format. " +
 						"Optionally creates a training/test dataset from the extracted CoNLL files.",
 				options,

@@ -1,6 +1,5 @@
-package BIOfid.BioEncoder;
+package org.texttechnologylab.uima.conll.iobencoder;
 
-import BIOfid.ConllFeature.ConllFeatures;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import de.tudarmstadt.ukp.dkpro.core.api.metadata.type.DocumentMetaData;
@@ -13,11 +12,13 @@ import org.apache.uima.jcas.JCas;
 import org.apache.uima.jcas.cas.TOP;
 import org.apache.uima.jcas.tcas.Annotation;
 import org.apache.uima.util.CasCopier;
-import org.texttechnologielab.annotation.type.Fingerprint;
 import org.texttechnologylab.annotation.AbstractNamedEntity;
 import org.texttechnologylab.annotation.NamedEntity;
+import org.texttechnologylab.annotation.type.Fingerprint;
 import org.texttechnologylab.annotation.type.Other;
 import org.texttechnologylab.annotation.type.Taxon;
+import org.texttechnologylab.annotation.type.TexttechnologyNamedEntity;
+import org.texttechnologylab.uima.conll.extractor.ConllFeatures;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -25,28 +26,31 @@ import java.util.stream.Collectors;
 import static org.apache.uima.fit.util.JCasUtil.indexCovered;
 import static org.apache.uima.fit.util.JCasUtil.select;
 
-public class TTLabHierarchicalBioEncoder extends GenericBioEncoder<Annotation> {
+public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 	
 	/**
-	 * DKProHierarchicalBioEncoder that filters for fingerprinted annotations and includes all {@link Taxon} annotations by default
-	 * <p>See {@link TTLabHierarchicalBioEncoder#TTLabHierarchicalBioEncoder(JCas, boolean, ArrayList, ImmutableSet, boolean)}.
+	 * DKProHierarchicalBioEncoder that filters for fingerprinted annotations and includes all {@link Taxon} annotations
+	 * by default
+	 * <p>See {@link TTLabHierarchicalIobEncoder#TTLabHierarchicalIobEncoder(JCas, boolean, ArrayList, ImmutableSet,
+	 * boolean)}.
 	 *
 	 * @param jCas The JCas to process.
 	 */
-	public TTLabHierarchicalBioEncoder(JCas jCas) {
+	public TTLabHierarchicalIobEncoder(JCas jCas) {
 		this(jCas, true, Lists.newArrayList(NamedEntity.class, AbstractNamedEntity.class), ImmutableSet.of(), false);
 	}
 	
 	/**
 	 * DKProHierarchicalBioEncoder that includes all {@link Taxon} annotations by default
-	 * <p>See {@link TTLabHierarchicalBioEncoder#TTLabHierarchicalBioEncoder(JCas, boolean, ArrayList, ImmutableSet, boolean)}.
+	 * <p>See {@link TTLabHierarchicalIobEncoder#TTLabHierarchicalIobEncoder(JCas, boolean, ArrayList, ImmutableSet,
+	 * boolean)}.
 	 *
 	 * @param jCas                 The JCas to process.
 	 * @param pFilterFingerprinted If true, only fingerprinted {@link NamedEntity NamedEntities} are processed.
 	 * @param annotatorSet
 	 * @param annotatorRelation
 	 */
-	public TTLabHierarchicalBioEncoder(JCas jCas, boolean pFilterFingerprinted, ImmutableSet<String> annotatorSet, boolean annotatorRelation) {
+	public TTLabHierarchicalIobEncoder(JCas jCas, boolean pFilterFingerprinted, ImmutableSet<String> annotatorSet, boolean annotatorRelation) {
 		this(jCas, pFilterFingerprinted, Lists.newArrayList(NamedEntity.class, AbstractNamedEntity.class), annotatorSet, annotatorRelation);
 	}
 	
@@ -59,7 +63,7 @@ public class TTLabHierarchicalBioEncoder extends GenericBioEncoder<Annotation> {
 	 * @param annotatorSet
 	 * @param annotatorRelation
 	 */
-	public TTLabHierarchicalBioEncoder(JCas jCas, boolean pFilterFingerprinted, ArrayList<Class<? extends Annotation>> includeAnnotations, ImmutableSet<String> annotatorSet, boolean annotatorRelation) {
+	public TTLabHierarchicalIobEncoder(JCas jCas, boolean pFilterFingerprinted, ArrayList<Class<? extends Annotation>> includeAnnotations, ImmutableSet<String> annotatorSet, boolean annotatorRelation) {
 		super(jCas, pFilterFingerprinted, includeAnnotations, annotatorSet, annotatorRelation);
 		this.type = Annotation.class;
 		this.build();
@@ -198,10 +202,10 @@ public class TTLabHierarchicalBioEncoder extends GenericBioEncoder<Annotation> {
 	 * This sorts top level annotations first, as longer annotations precede others in the iteration order returned by
 	 * {@link JCasUtil#select(JCas, Class)}.
 	 * </p><p>
-	 * For each rank, get all token covered by a NE and add the BIO code to the tokens hierarchy in the
-	 * {@link DKProHierarchicalBioEncoder#hierachialTokenNamedEntityMap}. After each iteration, check all <i>higher</i> ranks
-	 * for annotations, that cover annotations which are still unvisited in at this rank.
-	 * At the end of each iteration over a rank, add an "O" to all not covered tokens.
+	 * For each rank, get all token covered by a NE and add the BIO code to the tokens hierarchy in the {@link
+	 * DKProHierarchicalIobEncoder#hierachialTokenNamedEntityMap}. After each iteration, check all <i>higher</i> ranks
+	 * for annotations, that cover annotations which are still unvisited in at this rank. At the end of each iteration
+	 * over a rank, add an "O" to all not covered tokens.
 	 * </p><p>
 	 * This approach <b>will</b> "fill" holes created by three or more annotations overlapping, ie. given:
 	 * <pre>
@@ -222,7 +226,7 @@ public class TTLabHierarchicalBioEncoder extends GenericBioEncoder<Annotation> {
 	 *
 	 * @param jCas   The JCas containing the annotations.
 	 * @param tokens A list of token to be considered.
-	 * @see DKProHierarchicalBioEncoder#naiveStackingApproach(JCas, ArrayList) naiveStackingApproach(JCas, ArrayList)
+	 * @see DKProHierarchicalIobEncoder#naiveStackingApproach(JCas, ArrayList) naiveStackingApproach(JCas, ArrayList)
 	 */
 	public void breadthFirstSearch(JCas jCas, ArrayList<Token> tokens) {
 		Map<Annotation, Collection<Token>> tokenNeIndex = indexCovered(jCas, Annotation.class, Token.class);
@@ -309,8 +313,8 @@ public class TTLabHierarchicalBioEncoder extends GenericBioEncoder<Annotation> {
 			NamedEntity ne = (NamedEntity) namedEntity;
 			features.setAbstract(false);
 			features.setMetaphor(ne.getMetaphor());
-		} else if (namedEntity instanceof org.texttechnologielab.annotation.type.TexttechnologyNamedEntity) {
-			features.name(((org.texttechnologielab.annotation.type.TexttechnologyNamedEntity) namedEntity).getValue());
+		} else if (namedEntity instanceof TexttechnologyNamedEntity) {
+			features.name(((TexttechnologyNamedEntity) namedEntity).getValue());
 		} else {
 			features.name("<UNK>");
 		}

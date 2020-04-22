@@ -1,6 +1,5 @@
-package BIOfid.BioEncoder;
+package org.texttechnologylab.uima.conll.iobencoder;
 
-import BIOfid.ConllFeature.ConllFeatures;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
@@ -12,11 +11,13 @@ import org.apache.uima.jcas.JCas;
 import org.apache.uima.jcas.cas.TOP;
 import org.apache.uima.jcas.tcas.Annotation;
 import org.apache.uima.util.CasCopier;
-import org.texttechnologielab.annotation.type.Fingerprint;
 import org.texttechnologylab.annotation.AbstractNamedEntity;
 import org.texttechnologylab.annotation.NamedEntity;
+import org.texttechnologylab.annotation.type.Fingerprint;
 import org.texttechnologylab.annotation.type.Other;
+import org.texttechnologylab.annotation.type.TexttechnologyNamedEntity;
 import org.texttechnologylab.utilities.collections.CountMap;
+import org.texttechnologylab.uima.conll.extractor.ConllFeatures;
 
 import java.util.*;
 import java.util.function.Function;
@@ -25,7 +26,7 @@ import java.util.stream.IntStream;
 
 import static org.apache.uima.fit.util.JCasUtil.*;
 
-public abstract class GenericBioEncoder<T extends Annotation> {
+public abstract class GenericIobEncoder<T extends Annotation> {
 	final HashMap<Token, ArrayList<ConllFeatures>> hierachialTokenNamedEntityMap;
 	final CountMap<T> namedEntityHierachy;
 	final boolean filterFingerprinted;
@@ -57,11 +58,11 @@ public abstract class GenericBioEncoder<T extends Annotation> {
 	final boolean annotatorRelation;
 	
 	
-	protected GenericBioEncoder(JCas jCas, boolean pFilterFingerprinted, ImmutableSet<String> annotatorSet) {
+	protected GenericIobEncoder(JCas jCas, boolean pFilterFingerprinted, ImmutableSet<String> annotatorSet) {
 		this(jCas, false, new ArrayList<>(), annotatorSet, true);
 	}
 	
-	GenericBioEncoder(JCas jCas, boolean pFilterFingerprinted, ArrayList<Class<? extends Annotation>> forceAnnotations, ImmutableSet<String> annotatorSet, boolean annotatorRelation) {
+	GenericIobEncoder(JCas jCas, boolean pFilterFingerprinted, ArrayList<Class<? extends Annotation>> forceAnnotations, ImmutableSet<String> annotatorSet, boolean annotatorRelation) {
 		this.jCas = jCas;
 		this.hierachialTokenNamedEntityMap = new HashMap<>();
 		this.namedEntityHierachy = new CountMap<>();
@@ -83,7 +84,7 @@ public abstract class GenericBioEncoder<T extends Annotation> {
 			if (jCas.getDocumentText() == null)
 				return;
 			
-			final JCas mergedCas = JCasFactory.createJCas();
+			mergedCas = JCasFactory.createJCas();
 			mergeViews();
 			
 			final LinkedHashSet<T> namedEntities = new LinkedHashSet<>(select(mergedCas, this.type));
@@ -163,10 +164,10 @@ public abstract class GenericBioEncoder<T extends Annotation> {
 	 * This sorts top level annotations first, as longer annotations precede others in the iteration order returned by
 	 * {@link JCasUtil#select(JCas, Class)}.
 	 * </p><p>
-	 * For each rank, get all token covered by a NE and add the BIO code to the tokens hierarchy in the
-	 * {@link DKProHierarchicalBioEncoder#hierachialTokenNamedEntityMap}. After each iteration, check all <i>higher</i> ranks
-	 * for annotations, that cover annotations which are still unvisited in at this rank.
-	 * At the end of each iteration over a rank, add an "O" to all not covered tokens.
+	 * For each rank, get all token covered by a NE and add the BIO code to the tokens hierarchy in the {@link
+	 * DKProHierarchicalIobEncoder#hierachialTokenNamedEntityMap}. After each iteration, check all <i>higher</i> ranks
+	 * for annotations, that cover annotations which are still unvisited in at this rank. At the end of each iteration
+	 * over a rank, add an "O" to all not covered tokens.
 	 * </p><p>
 	 * This approach <b>will</b> "fill" holes created by three or more annotations overlapping, ie. given:
 	 * <pre>
@@ -187,7 +188,7 @@ public abstract class GenericBioEncoder<T extends Annotation> {
 	 *
 	 * @param jCas   The JCas containing the annotations.
 	 * @param tokens A list of token to be considered.
-	 * @see DKProHierarchicalBioEncoder#naiveStackingApproach(JCas, ArrayList) naiveStackingApproach(JCas, ArrayList)
+	 * @see DKProHierarchicalIobEncoder#naiveStackingApproach(JCas, ArrayList) naiveStackingApproach(JCas, ArrayList)
 	 */
 	public void breadthFirstSearch(JCas jCas, ArrayList<Token> tokens) {
 		Map<T, Collection<Token>> tokenNeIndex = indexCovered(jCas, type, Token.class);
@@ -281,8 +282,8 @@ public abstract class GenericBioEncoder<T extends Annotation> {
 	 * This sorts top level annotations first, as longer annotations precede others in the iteration order returned by
 	 * {@link JCasUtil#select(JCas, Class)}.
 	 * </p><p>
-	 * For each rank, get all token covered by a NE and add the BIO code to the tokens hierarchy in the
-	 * {@link DKProHierarchicalBioEncoder#hierachialTokenNamedEntityMap}. At the end of each iteration over a rank, add an "O"
+	 * For each rank, get all token covered by a NE and add the BIO code to the tokens hierarchy in the {@link
+	 * DKProHierarchicalIobEncoder#hierachialTokenNamedEntityMap}. At the end of each iteration over a rank, add an "O"
 	 * to all not covered tokens.
 	 * </p><p>
 	 * This approach will <b>not</b> "fill" holes created by three or more annotations overlapping, ie. given:
@@ -299,7 +300,7 @@ public abstract class GenericBioEncoder<T extends Annotation> {
 	 *
 	 * @param jCas   The JCas containing the annotations.
 	 * @param tokens A list of token to be considered.
-	 * @see DKProHierarchicalBioEncoder#breadthFirstSearch(JCas, ArrayList) breadthFirstSearch(JCas, ArrayList)
+	 * @see DKProHierarchicalIobEncoder#breadthFirstSearch(JCas, ArrayList) breadthFirstSearch(JCas, ArrayList)
 	 */
 	public void naiveStackingApproach(JCas jCas, ArrayList<Token> tokens) {
 		Map<T, Collection<Token>> tokenNeIndex = indexCovered(jCas, this.type, Token.class);
@@ -398,8 +399,8 @@ public abstract class GenericBioEncoder<T extends Annotation> {
 			} else {
 				features.name(value);
 			}
-		} else if (namedEntity instanceof org.texttechnologielab.annotation.type.TexttechnologyNamedEntity) {
-			features.name(((org.texttechnologielab.annotation.type.TexttechnologyNamedEntity) namedEntity).getValue());
+		} else if (namedEntity instanceof TexttechnologyNamedEntity) {
+			features.name(((TexttechnologyNamedEntity) namedEntity).getValue());
 		} else {
 			features.name("<UNK>");
 		}

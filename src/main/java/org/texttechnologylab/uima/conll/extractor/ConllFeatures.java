@@ -1,4 +1,4 @@
-package BIOfid.ConllFeature;
+package org.texttechnologylab.uima.conll.extractor;
 
 import java.util.ArrayList;
 import java.util.Arrays;

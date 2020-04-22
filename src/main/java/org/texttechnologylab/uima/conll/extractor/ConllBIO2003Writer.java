@@ -1,14 +1,11 @@
-package BIOfid.Extraction;
+package org.texttechnologylab.uima.conll.extractor;
 
-import BIOfid.BioEncoder.DKProHierarchicalBioEncoder;
-import BIOfid.BioEncoder.GenericBioEncoder;
-import BIOfid.BioEncoder.TTLabHierarchicalBioEncoder;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.Streams;
+import de.tudarmstadt.ukp.dkpro.core.api.lexmorph.type.pos.POS;
 import de.tudarmstadt.ukp.dkpro.core.api.metadata.type.DocumentMetaData;
-import de.tudarmstadt.ukp.dkpro.core.api.parameter.ComponentParameters;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Lemma;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
@@ -25,9 +22,13 @@ import org.apache.uima.jcas.JCas;
 import org.apache.uima.jcas.cas.DoubleArray;
 import org.apache.uima.jcas.cas.StringArray;
 import org.apache.uima.jcas.tcas.Annotation;
-import org.jetbrains.annotations.NotNull;
+import org.dkpro.core.api.parameter.ComponentParameters;
 import org.texttechnologylab.iaa.AgreementContainer;
+import org.texttechnologylab.uima.conll.iobencoder.DKProHierarchicalIobEncoder;
+import org.texttechnologylab.uima.conll.iobencoder.GenericIobEncoder;
+import org.texttechnologylab.uima.conll.iobencoder.TTLabHierarchicalIobEncoder;
 
+import javax.validation.constraints.NotNull;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -193,7 +194,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 					// Check if there are categories with high enough agreement
 					if (!filteredCategories.isEmpty()) {
 						if (pUseTTLabTypesystem) {
-							TTLabHierarchicalBioEncoder hierarchicalBioEncoder = new TTLabHierarchicalBioEncoder(aJCas, pFilterFingerprinted, filteredCategories, validViewNames, pAnnotatorRelation);
+							TTLabHierarchicalIobEncoder hierarchicalBioEncoder = new TTLabHierarchicalIobEncoder(aJCas, pFilterFingerprinted, filteredCategories, validViewNames, pAnnotatorRelation);
 							if (hierarchicalBioEncoder.getNamedEntitiyCount() > 0) {
 								printConllFile(hierarchicalBioEncoder);
 							} else {
@@ -201,7 +202,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 								return;
 							}
 						} else {
-							DKProHierarchicalBioEncoder hierarchicalBioEncoder = new DKProHierarchicalBioEncoder(aJCas, pFilterFingerprinted, filteredCategories, validViewNames, pAnnotatorRelation);
+							DKProHierarchicalIobEncoder hierarchicalBioEncoder = new DKProHierarchicalIobEncoder(aJCas, pFilterFingerprinted, filteredCategories, validViewNames, pAnnotatorRelation);
 							if (hierarchicalBioEncoder.getNamedEntitiyCount() > 0) {
 								printConllFile(hierarchicalBioEncoder);
 							} else {
@@ -210,17 +211,12 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 							}
 						}
 					} else {
-						try {
-							printWarning(aJCas, String.format(" as no category has at least %.2f agreement.", pFilterByAgreement));
-						} catch (Exception x) {
-							printWarning(aJCas, String.format(" as no category has at least %.2f agreement.", pFilterByAgreement));
-						}
+						printWarning(aJCas, String.format(" as no category has at least %.2f agreement.", pFilterByAgreement));
 					}
-					return;
 				} else { // No IAA filtering
 					if (validViewNames.size() >= pMinViews) { // .. but at least the required number of views
 						if (pUseTTLabTypesystem) {
-							TTLabHierarchicalBioEncoder hierarchicalBioEncoder = new TTLabHierarchicalBioEncoder(aJCas, pFilterFingerprinted, validViewNames, pAnnotatorRelation);
+							TTLabHierarchicalIobEncoder hierarchicalBioEncoder = new TTLabHierarchicalIobEncoder(aJCas, pFilterFingerprinted, validViewNames, pAnnotatorRelation);
 							if (hierarchicalBioEncoder.getNamedEntitiyCount() > 0) {
 								printConllFile(hierarchicalBioEncoder);
 							} else {
@@ -228,7 +224,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 								return;
 							}
 						} else {
-							DKProHierarchicalBioEncoder hierarchicalBioEncoder = new DKProHierarchicalBioEncoder(aJCas, pFilterFingerprinted, validViewNames, pAnnotatorRelation);
+							DKProHierarchicalIobEncoder hierarchicalBioEncoder = new DKProHierarchicalIobEncoder(aJCas, pFilterFingerprinted, validViewNames, pAnnotatorRelation);
 							if (hierarchicalBioEncoder.getNamedEntitiyCount() > 0) {
 								printConllFile(hierarchicalBioEncoder);
 							} else {
@@ -266,7 +262,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 		}
 	}
 	
-	private <T extends Annotation> void printConllFile(GenericBioEncoder<T> hierarchicalBioEncoder) {
+	private <T extends Annotation> void printConllFile(GenericIobEncoder<T> hierarchicalBioEncoder) {
 		JCas aJCas = hierarchicalBioEncoder.getMergedCas();
 		try (PrintWriter conllWriter = getPrintWriter(aJCas, filenameSuffix)) {
 			
@@ -279,11 +275,28 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 				int entityCount = 0;
 				for (Token token : coveredTokens) {
 					Lemma lemma = token.getLemma();
+					POS pos = token.getPos();
 					Row row = new Row();
 					row.token = token;
-					row.chunk = (lemma != null && !Strings.isNullOrEmpty(lemma.getValue())) && !lemma.getValue().equals("null") ? lemma.getValue() : UNUSED;
+					
+					row.lemma = UNUSED;
+					if (writeChunk && lemma != null) {
+						String lemmaValue = lemma.getValue();
+						if (!Strings.isNullOrEmpty(lemmaValue) && !lemmaValue.equals("null")) {
+							row.lemma = lemmaValue;
+						} else row.lemma = UNUSED;
+					}
+					
+					row.pos = UNUSED;
+					if (writePos && pos != null) {
+						String posValue = pos.getPosValue();
+						if (!Strings.isNullOrEmpty(posValue) && !posValue.equals("null")) {
+							row.pos = posValue;
+						}
+					}
+					
 					row.entities = hierarchicalBioEncoder.getFeatures(token, pEncoderStrategyIndex);
-					if (row.entities.size() > 0 && !ImmutableSet.of("O", "B-O").contains(row.entities.get(0))) {
+					if (!row.entities.isEmpty() && !ImmutableSet.of("O", "B-O").contains(row.entities.get(0))) {
 						entityCount++;
 					}
 					ctokens.put(row.token, row);
@@ -293,24 +306,13 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 				if (!pFilterEmptySentences || entityCount > 0) {
 					// Write sentence in CONLL 2006 format
 					for (Row row : ctokens.values()) {
-						String pos = UNUSED;
-						if (writePos) {
-							if (row.token.getPos() != null && row.token.getPos().getPosValue() != null) {
-								pos = row.token.getPos().getPosValue();
-							} else {
-								pos = UNUSED;
-							}
-						}
-						
-						String chunk = UNUSED;
-						if (writeChunk && (row.chunk != null)) {
-							chunk = row.chunk;
-						}
+						String pos = row.pos;
+						String lemma = row.lemma;
 						
 						String namedEntityFeatures = UNUSED;
 						if (writeNamedEntity && (row.entities != null)) {
 							StringBuilder neBuilder = new StringBuilder();
-							ArrayList<String> ne = row.entities; /// Fixme
+							ArrayList<String> ne = row.entities;
 							for (int i = 0; i < ne.size(); ) {
 								String entry = ne.get(i);
 								neBuilder.append(entry);
@@ -321,7 +323,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 							namedEntityFeatures = neBuilder.toString();
 						}
 						
-						conllWriter.printf("%s%s%s%s%s%s%s\n", row.token.getCoveredText(), pConllSeparator, pos, pConllSeparator, chunk, pConllSeparator, namedEntityFeatures);
+						conllWriter.printf("%s%s%s%s%s%s%s%n", row.token.getCoveredText(), pConllSeparator, pos, pConllSeparator, lemma, pConllSeparator, namedEntityFeatures);
 					}
 					conllWriter.println();
 				} else {
@@ -391,7 +393,8 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 	
 	private static final class Row {
 		Token token;
-		String chunk;
+		String lemma;
+		String pos;
 		ArrayList<String> entities;
 	}
 	

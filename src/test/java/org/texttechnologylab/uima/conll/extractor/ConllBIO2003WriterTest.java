@@ -1,5 +1,5 @@
-import BIOfid.BioEncoder.DKProHierarchicalBioEncoder;
-import BIOfid.Extraction.ConllBIO2003Writer;
+package org.texttechnologylab.uima.conll.extractor;
+
 import com.google.common.collect.Lists;
 import de.tudarmstadt.ukp.dkpro.core.api.metadata.type.DocumentMetaData;
 import de.tudarmstadt.ukp.dkpro.core.api.ner.type.Location;
@@ -7,7 +7,6 @@ import de.tudarmstadt.ukp.dkpro.core.api.ner.type.Organization;
 import de.tudarmstadt.ukp.dkpro.core.api.ner.type.Person;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
-import de.tudarmstadt.ukp.dkpro.core.io.xmi.XmiReader;
 import org.apache.uima.UIMAException;
 import org.apache.uima.analysis_engine.AnalysisEngine;
 import org.apache.uima.collection.CollectionReader;
@@ -17,11 +16,15 @@ import org.apache.uima.fit.factory.JCasFactory;
 import org.apache.uima.fit.pipeline.SimplePipeline;
 import org.apache.uima.fit.util.JCasUtil;
 import org.apache.uima.jcas.JCas;
-import org.biofid.agreement.engine.TTLabUnitizingIAACollectionProcessingEngine;
+import org.dkpro.core.io.xmi.XmiReader;
 import org.junit.Test;
+import org.texttechnologylab.agreement.engine.TTLabUnitizingIAACollectionProcessingEngine;
+import org.texttechnologylab.uima.conll.iobencoder.DKProHierarchicalIobEncoder;
 
 import java.io.IOException;
 import java.util.ArrayList;
+
+import static org.texttechnologylab.agreement.engine.TTLabUnitizingIAACollectionProcessingEngine.*;
 
 public class ConllBIO2003WriterTest {
 	
@@ -30,7 +33,7 @@ public class ConllBIO2003WriterTest {
 		try {
 			JCas jCas = getjCas();
 			
-			DKProHierarchicalBioEncoder encoder = new DKProHierarchicalBioEncoder(jCas, false);
+			DKProHierarchicalIobEncoder encoder = new DKProHierarchicalIobEncoder(jCas, false);
 			
 			ArrayList<Token> tokens = Lists.newArrayList(JCasUtil.select(jCas, Token.class));
 			for (int i = 0; i < tokens.size(); i++) {
@@ -60,7 +63,7 @@ public class ConllBIO2003WriterTest {
 			JCas jCas = getjCas();
 			
 			// Metadata
-			DocumentMetaData documentMetaData = new DocumentMetaData(jCas);
+			DocumentMetaData documentMetaData = DocumentMetaData.create(jCas);
 			documentMetaData.setDocumentId("basic");
 			documentMetaData.setDocumentUri("basicGUF");
 			
@@ -68,7 +71,11 @@ public class ConllBIO2003WriterTest {
 					ConllBIO2003Writer.class,
 					ConllBIO2003Writer.PARAM_TARGET_LOCATION, "src/test/out/",
 					ConllBIO2003Writer.PARAM_OVERWRITE, true,
-					ConllBIO2003Writer.PARAM_FILTER_FINGERPRINTED, false);
+					ConllBIO2003Writer.PARAM_FILTER_FINGERPRINTED, false,
+					ConllBIO2003Writer.PARAM_MIN_VIEWS, 0,
+					ConllBIO2003Writer.PARAM_USE_TTLAB_TYPESYSTEM, false,
+					ConllBIO2003Writer.PARAM_ANNOTATOR_RELATION, false
+			);
 			
 			conllEngine.process(jCas);
 		} catch (UIMAException e) {
@@ -82,7 +89,7 @@ public class ConllBIO2003WriterTest {
 			JCas jCas = getjCas();
 			
 			// Metadata
-			DocumentMetaData documentMetaData = new DocumentMetaData(jCas);
+			DocumentMetaData documentMetaData = DocumentMetaData.create(jCas);
 			documentMetaData.setDocumentId("singleColumn");
 			documentMetaData.setDocumentUri("singleColumnGUF");
 			
@@ -90,50 +97,14 @@ public class ConllBIO2003WriterTest {
 					ConllBIO2003Writer.class,
 					ConllBIO2003Writer.PARAM_TARGET_LOCATION, "src/test/out/",
 					ConllBIO2003Writer.PARAM_OVERWRITE, true,
-					ConllBIO2003Writer.PARAM_FILTER_FINGERPRINTED, false);
+					ConllBIO2003Writer.PARAM_FILTER_FINGERPRINTED, false,
+					ConllBIO2003Writer.PARAM_MIN_VIEWS, 0,
+					ConllBIO2003Writer.PARAM_USE_TTLAB_TYPESYSTEM, false,
+					ConllBIO2003Writer.PARAM_ANNOTATOR_RELATION, false
+			);
 			
 			conllEngine.process(jCas);
 		} catch (UIMAException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	@Test
-	public void exampleFile() {
-		try {
-			String[] annotatorWhitelist = {"305236", "305235"};
-			final AnalysisEngine agreementEngine = AnalysisEngineFactory.createEngine(TTLabUnitizingIAACollectionProcessingEngine.class,
-					TTLabUnitizingIAACollectionProcessingEngine.PARAM_ANNOTATOR_LIST, annotatorWhitelist,
-					TTLabUnitizingIAACollectionProcessingEngine.PARAM_ANNOTATOR_RELATION, TTLabUnitizingIAACollectionProcessingEngine.WHITELIST,
-					TTLabUnitizingIAACollectionProcessingEngine.PARAM_MULTI_CAS_HANDLING, TTLabUnitizingIAACollectionProcessingEngine.SEPARATE,
-					TTLabUnitizingIAACollectionProcessingEngine.PARAM_PRINT_STATS, false,
-					TTLabUnitizingIAACollectionProcessingEngine.PARAM_MIN_VIEWS, 2,
-					TTLabUnitizingIAACollectionProcessingEngine.PARAM_MIN_ANNOTATIONS, 0,
-					TTLabUnitizingIAACollectionProcessingEngine.PARAM_ANNOTATE_DOCUMENT, true
-			);
-			
-			final AnalysisEngine conllEngine = AnalysisEngineFactory.createEngine(
-					ConllBIO2003Writer.class,
-					ConllBIO2003Writer.PARAM_TARGET_LOCATION, "/home/stud_homes/s3676959/Data/BIOfid/Annotated/conll/",
-					ConllBIO2003Writer.PARAM_OVERWRITE, true,
-					ConllBIO2003Writer.PARAM_USE_TTLAB_TYPESYSTEM, true,
-					ConllBIO2003Writer.PARAM_STRATEGY_INDEX, 1,
-					ConllBIO2003Writer.PARAM_FILTER_FINGERPRINTED, true,
-					ConllBIO2003Writer.PARAM_ANNOTATOR_LIST, annotatorWhitelist,
-					ConllBIO2003Writer.PARAM_ANNOTATOR_RELATION, ConllBIO2003Writer.WHITELIST,
-					ConllBIO2003Writer.PARAM_MIN_VIEWS, 1,
-					ConllBIO2003Writer.PARAM_FILTER_BY_AGREEMENT, 0.6F,
-					ConllBIO2003Writer.PARAM_FILTER_EMPTY_SENTENCES, true);
-			
-			CollectionReader reader = CollectionReaderFactory.createReader(XmiReader.class,
-					XmiReader.PARAM_PATTERNS, "[+]**.xmi",
-					XmiReader.PARAM_SOURCE_LOCATION, "/home/stud_homes/s3676959/Data/BIOfid/Annotated/xmi/",
-					XmiReader.PARAM_LENIENT, true
-			);
-			SimplePipeline.runPipeline(reader, agreementEngine, conllEngine);
-		} catch (UIMAException e) {
-			e.printStackTrace();
-		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
@@ -144,7 +115,7 @@ public class ConllBIO2003WriterTest {
 			JCas jCas = getjCas();
 			
 			// Metadata
-			DocumentMetaData documentMetaData = new DocumentMetaData(jCas);
+			DocumentMetaData documentMetaData = DocumentMetaData.create(jCas);
 			documentMetaData.setDocumentId("doubleColumn");
 			documentMetaData.setDocumentUri("doubleColumnGUF");
 			
@@ -153,7 +124,11 @@ public class ConllBIO2003WriterTest {
 					ConllBIO2003Writer.PARAM_TARGET_LOCATION, "src/test/out/",
 					ConllBIO2003Writer.PARAM_OVERWRITE, true,
 					ConllBIO2003Writer.PARAM_NAMED_ENTITY_COLUMNS, 2,
-					ConllBIO2003Writer.PARAM_FILTER_FINGERPRINTED, false);
+					ConllBIO2003Writer.PARAM_FILTER_FINGERPRINTED, false,
+					ConllBIO2003Writer.PARAM_MIN_VIEWS, 0,
+					ConllBIO2003Writer.PARAM_USE_TTLAB_TYPESYSTEM, false,
+					ConllBIO2003Writer.PARAM_ANNOTATOR_RELATION, false
+			);
 			
 			conllEngine.process(jCas);
 		} catch (UIMAException e) {
@@ -167,7 +142,7 @@ public class ConllBIO2003WriterTest {
 			JCas jCas = getjCas();
 			
 			// Metadata
-			DocumentMetaData documentMetaData = new DocumentMetaData(jCas);
+			DocumentMetaData documentMetaData = DocumentMetaData.create(jCas);
 			documentMetaData.setDocumentId("tripleColumn");
 			documentMetaData.setDocumentUri("tripleColumnGUF");
 			
@@ -176,11 +151,57 @@ public class ConllBIO2003WriterTest {
 					ConllBIO2003Writer.PARAM_TARGET_LOCATION, "src/test/out/",
 					ConllBIO2003Writer.PARAM_OVERWRITE, true,
 					ConllBIO2003Writer.PARAM_NAMED_ENTITY_COLUMNS, 3,
-					ConllBIO2003Writer.PARAM_STRATEGY_INDEX, 1,
-					ConllBIO2003Writer.PARAM_FILTER_FINGERPRINTED, false);
+					ConllBIO2003Writer.PARAM_FILTER_FINGERPRINTED, false,
+					ConllBIO2003Writer.PARAM_MIN_VIEWS, 0,
+					ConllBIO2003Writer.PARAM_USE_TTLAB_TYPESYSTEM, false,
+					ConllBIO2003Writer.PARAM_ANNOTATOR_RELATION, false
+			);
 			
 			conllEngine.process(jCas);
 		} catch (UIMAException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	@Test
+	public void exampleFile() {
+		try {
+//			String[] annotatorWhitelist = {"305236", "305235"};
+			final AnalysisEngine agreementEngine = AnalysisEngineFactory.createEngine(
+					TTLabUnitizingIAACollectionProcessingEngine.class,
+//					PARAM_ANNOTATOR_LIST, annotatorWhitelist,
+//					PARAM_ANNOTATOR_RELATION, WHITELIST,
+					PARAM_ANNOTATOR_RELATION, BLACKLIST,
+					PARAM_MULTI_CAS_HANDLING, SEPARATE,
+					PARAM_PRINT_STATS, false,
+					PARAM_MIN_VIEWS, 1,
+					PARAM_MIN_ANNOTATIONS, 0,
+					PARAM_ANNOTATE_DOCUMENT, true
+			);
+			
+			final AnalysisEngine conllEngine = AnalysisEngineFactory.createEngine(
+					ConllBIO2003Writer.class,
+					ConllBIO2003Writer.PARAM_TARGET_LOCATION, "src/test/out/",
+					ConllBIO2003Writer.PARAM_OVERWRITE, true,
+					ConllBIO2003Writer.PARAM_USE_TTLAB_TYPESYSTEM, true,
+					ConllBIO2003Writer.PARAM_STRATEGY_INDEX, 1,
+					ConllBIO2003Writer.PARAM_FILTER_FINGERPRINTED, true,
+//					ConllBIO2003Writer.PARAM_ANNOTATOR_LIST, annotatorWhitelist,
+//					ConllBIO2003Writer.PARAM_ANNOTATOR_RELATION, ConllBIO2003Writer.WHITELIST,
+					ConllBIO2003Writer.PARAM_ANNOTATOR_RELATION, ConllBIO2003Writer.BLACKLIST,
+					ConllBIO2003Writer.PARAM_MIN_VIEWS, 1,
+					ConllBIO2003Writer.PARAM_FILTER_BY_AGREEMENT, 0.6F,
+					ConllBIO2003Writer.PARAM_FILTER_EMPTY_SENTENCES, true);
+			
+			CollectionReader reader = CollectionReaderFactory.createReader(XmiReader.class,
+					XmiReader.PARAM_PATTERNS, "[+]**.xmi",
+					XmiReader.PARAM_SOURCE_LOCATION, "../Utilities/src/test/out/xmi/",
+					XmiReader.PARAM_LENIENT, true
+			);
+			SimplePipeline.runPipeline(reader, agreementEngine, conllEngine);
+		} catch (UIMAException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
