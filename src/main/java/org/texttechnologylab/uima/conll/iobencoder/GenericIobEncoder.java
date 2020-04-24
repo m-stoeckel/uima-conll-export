@@ -11,13 +11,12 @@ import org.apache.uima.jcas.JCas;
 import org.apache.uima.jcas.cas.TOP;
 import org.apache.uima.jcas.tcas.Annotation;
 import org.apache.uima.util.CasCopier;
-import org.texttechnologylab.annotation.AbstractNamedEntity;
-import org.texttechnologylab.annotation.NamedEntity;
+import org.jetbrains.annotations.NotNull;
 import org.texttechnologylab.annotation.type.Fingerprint;
-import org.texttechnologylab.annotation.type.Other;
 import org.texttechnologylab.annotation.type.TexttechnologyNamedEntity;
+import org.texttechnologylab.uima.conll.extractor.SingleConllFeatures;
+import org.texttechnologylab.uima.conll.extractor.IConllFeatures;
 import org.texttechnologylab.utilities.collections.CountMap;
-import org.texttechnologylab.uima.conll.extractor.ConllFeatures;
 
 import java.util.*;
 import java.util.function.Function;
@@ -27,23 +26,58 @@ import java.util.stream.IntStream;
 import static org.apache.uima.fit.util.JCasUtil.*;
 
 public abstract class GenericIobEncoder<T extends Annotation> {
-	final HashMap<Token, ArrayList<ConllFeatures>> hierachialTokenNamedEntityMap;
+	final HashMap<Token, ArrayList<IConllFeatures>> hierachialTokenNamedEntityMap;
 	final CountMap<T> namedEntityHierachy;
-	final boolean filterFingerprinted;
 	final JCas jCas;
 	final ArrayList<Class<? extends Annotation>> forceAnnotations;
 	final TreeMap<Integer, Token> tokenIndexMap;
 	
 	protected JCas mergedCas;
 	
+	/**
+	 * The base type of {@link Annotation Annotations} to iterate over.
+	 */
 	Class<T> type;
+	
 	/**
 	 * Set false to use IOB-1 format.
 	 */
-	boolean useIOB2; // FIXME
+	boolean useIOB2 = true; // FIXME
+	
+	/**
+	 * If true, filter all annotations by those covered by a {@link Fingerprint} annotation. Default: true.
+	 */
+	boolean filterFingerprinted = true;
+	
+	/**
+	 * If true, remove overlapping duplicate entries from multiple views of the same type. Default: true.
+	 */
+	boolean removeDuplicateSameType = true;
+	
+	/**
+	 * If true, remove overlapping duplicate entries from multiple views of the same type <b>only</b> if they start at
+	 * the same token. Default: true.
+	 */
+	boolean removeDuplicateConstrainBegin = true;
+	
+	/**
+	 * If true, remove overlapping duplicate entries from multiple views of the same type <b>only</b> if they end at the
+	 * same token. Default: false
+	 */
+	boolean removeDuplicateConstrainEnd = false;
+	
+	/**
+	 * The annotator relation can either be to {@link #BLACKLIST} or to {@link #WHITELIST} the anntotators in the {@link
+	 * #annotatorSet}. Default: {@link #BLACKLIST}
+	 */
+	boolean annotatorRelation = BLACKLIST;
+	public static boolean WHITELIST = true;
+	public static boolean BLACKLIST = false;
+	
 	TreeMap<Long, TreeSet<T>> namedEntityByRank;
 	ArrayList<Integer> maxCoverageOrder;
-	public LinkedHashMap<Integer, Long> coverageCount;
+	
+	public LinkedHashMap<Integer, Long> coverageCount = new LinkedHashMap<>();
 	
 	Comparator<Annotation> beginComparator = Comparator.comparingInt(Annotation::getBegin);
 	private Comparator<Annotation> hierachialComparator = new Comparator<Annotation>() {
@@ -55,24 +89,21 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 		}
 	};
 	final ImmutableSet<String> annotatorSet;
-	final boolean annotatorRelation;
 	
 	
-	protected GenericIobEncoder(JCas jCas, boolean pFilterFingerprinted, ImmutableSet<String> annotatorSet) {
-		this(jCas, false, new ArrayList<>(), annotatorSet, true);
+	protected GenericIobEncoder(JCas jCas, ImmutableSet<String> annotatorSet) {
+		this(jCas, new ArrayList<>(), annotatorSet);
 	}
 	
-	GenericIobEncoder(JCas jCas, boolean pFilterFingerprinted, ArrayList<Class<? extends Annotation>> forceAnnotations, ImmutableSet<String> annotatorSet, boolean annotatorRelation) {
+	GenericIobEncoder(JCas jCas, ArrayList<Class<? extends Annotation>> forceAnnotations, ImmutableSet<String> annotatorSet) {
 		this.jCas = jCas;
+		this.forceAnnotations = forceAnnotations;
+		this.annotatorSet = annotatorSet;
+		
 		this.hierachialTokenNamedEntityMap = new HashMap<>();
 		this.namedEntityHierachy = new CountMap<>();
 		this.namedEntityByRank = new TreeMap<>();
-		this.useIOB2 = true;
-		this.filterFingerprinted = pFilterFingerprinted;
-		this.forceAnnotations = forceAnnotations;
 		this.tokenIndexMap = new TreeMap<>();
-		this.annotatorSet = annotatorSet;
-		this.annotatorRelation = annotatorRelation;
 	}
 	
 	
@@ -89,6 +120,21 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 			
 			final LinkedHashSet<T> namedEntities = new LinkedHashSet<>(select(mergedCas, this.type));
 			
+			// Flatten the new view by removing identical duplicates
+			if (removeDuplicateSameType) {
+				LinkedHashSet<T> iterNamedEntities = (LinkedHashSet<T>) namedEntities.clone();
+				for (T parentNamedEntity : iterNamedEntities) {
+					JCasUtil.subiterate(mergedCas, type, parentNamedEntity, false, true)
+							.forEach(childNamedEntity -> {
+								if (namedEntities.contains(childNamedEntity)
+										&& parentNamedEntity.getType() == childNamedEntity.getType()
+										&& (!removeDuplicateConstrainBegin || parentNamedEntity.getBegin() == childNamedEntity.getBegin())
+										&& (!removeDuplicateConstrainEnd || parentNamedEntity.getEnd() == childNamedEntity.getEnd())
+								)
+									namedEntities.remove(childNamedEntity);
+							});
+				}
+			}
 			// Initialize the hierarchy
 			namedEntities.forEach(key -> namedEntityHierachy.put(key, 0L));
 			
@@ -122,8 +168,8 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 				breadthFirstSearch(mergedCas, tokens);
 			} else {
 				for (Token token : tokens) {
-					ArrayList<ConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(token);
-					namedEntityStringTreeMap.add(new ConllFeatures());
+					ArrayList<IConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(token);
+					namedEntityStringTreeMap.add(getEmptyConllFeatures());
 				}
 			}
 			
@@ -206,8 +252,8 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 				Collection<Token> coveredTokens = tokenNeIndex.get(namedEntity);
 				// If its not already covered, add this Named Entity to the tokens NE hierarchy
 				for (Token coveredToken : coveredTokens) {
-					ArrayList<ConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(coveredToken);
-					namedEntityStringTreeMap.add(getFeatures(namedEntity, coveredToken));
+					ArrayList<IConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(coveredToken);
+					namedEntityStringTreeMap.add(getConllFeatures(namedEntity, coveredToken));
 				}
 				visitedTokens.addAll(coveredTokens);
 				visitedEntities.add(namedEntity);
@@ -225,8 +271,8 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 						continue;
 					// If its not already covered, add this Named Entity to the tokens NE hierarchy
 					for (Token coveredToken : coveredTokens) {
-						ArrayList<ConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(coveredToken);
-						namedEntityStringTreeMap.add(getFeatures(namedEntity, coveredToken));
+						ArrayList<IConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(coveredToken);
+						namedEntityStringTreeMap.add(getConllFeatures(namedEntity, coveredToken));
 					}
 					visitedTokens.addAll(coveredTokens);
 					visitedEntities.add(namedEntity);
@@ -238,13 +284,15 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 			ArrayList<Token> notCoveredTokens = new ArrayList<>(tokens);
 			notCoveredTokens.removeAll(visitedTokens);
 			for (Token notCoveredToken : notCoveredTokens) {
-				ArrayList<ConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(notCoveredToken);
-				namedEntityStringTreeMap.add(new ConllFeatures());
+				ArrayList<IConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(notCoveredToken);
+				namedEntityStringTreeMap.add(getEmptyConllFeatures());
 			}
 		}
 		
+		// Check if the last level of the hierarchy is empty and can be removed
+		// TODO: Can other levels of the hierarchy be empty too and should be removed, too?
 		int lastIndex = rankSets.size() - 1;
-		if (lastIndex >= 0 && hierachialTokenNamedEntityMap.values().stream().allMatch(l -> l.get(lastIndex).equals("O")))
+		if (lastIndex >= 0 && hierachialTokenNamedEntityMap.values().stream().allMatch(l -> l.get(lastIndex).equals(getEmptyConllFeatures())))
 			hierachialTokenNamedEntityMap.values().forEach(l -> l.remove(lastIndex));
 	}
 	
@@ -252,7 +300,7 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 	 * Compute the coverage for each hierarchy level and list the level indices sorted by their respective coverage.
 	 */
 	public void createMaxCoverageLookup() {
-		Optional<ArrayList<ConllFeatures>> optionalArrayList = hierachialTokenNamedEntityMap.values().stream().findAny();
+		Optional<ArrayList<IConllFeatures>> optionalArrayList = hierachialTokenNamedEntityMap.values().stream().findAny();
 		maxCoverageOrder = new ArrayList<>();
 		if (optionalArrayList.isPresent()) {
 			int size = optionalArrayList.get().size();
@@ -260,7 +308,7 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 					.collect(Collectors.toMap(
 							Function.identity(),
 							i -> hierachialTokenNamedEntityMap.values().stream()
-									.filter(l -> l.get(i).isOut())
+									.filter(l -> !l.get(i).isOut())
 									.count(),
 							(u, v) -> u,
 							LinkedHashMap::new));
@@ -313,8 +361,8 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 				Collection<Token> coveredTokens = tokenNeIndex.get(namedEntity);
 				// Add this Named Entity to the tokens NE hierarchy
 				for (Token coveredToken : coveredTokens) {
-					ArrayList<ConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(coveredToken);
-					namedEntityStringTreeMap.add(getFeatures(namedEntity, coveredToken));
+					ArrayList<IConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(coveredToken);
+					namedEntityStringTreeMap.add(getConllFeatures(namedEntity, coveredToken));
 				}
 				rankCoveredTokens.addAll(coveredTokens);
 			}
@@ -324,8 +372,8 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 			ArrayList<Token> notCoveredTokens = new ArrayList<>(tokens);
 			notCoveredTokens.removeAll(rankCoveredTokens);
 			for (Token notCoveredToken : notCoveredTokens) {
-				ArrayList<ConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(notCoveredToken);
-				namedEntityStringTreeMap.add(new ConllFeatures());
+				ArrayList<IConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(notCoveredToken);
+				namedEntityStringTreeMap.add(getEmptyConllFeatures());
 			}
 		}
 	}
@@ -345,16 +393,16 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 			TreeSet<T> treeSet = tokenNeMap.get(curr_token);
 			treeSet.removeAll(usedEntities);
 			if (treeSet.isEmpty()) {
-				ArrayList<ConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(curr_token);
-				namedEntityStringTreeMap.add(new ConllFeatures());
+				ArrayList<IConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(curr_token);
+				namedEntityStringTreeMap.add(getEmptyConllFeatures());
 			} else {
 				for (T namedEntity : treeSet) {
 					if (usedEntities.contains(namedEntity)) continue;
 					else usedEntities.add(namedEntity);
 					for (Token coveredToken : tokenNeIndex.get(namedEntity)) { // FIXME: greift zurück, soll aber einen Konflikt finden!
 						curr_token = coveredToken;
-						ArrayList<ConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(curr_token);
-						namedEntityStringTreeMap.add(getFeatures(namedEntity, curr_token));
+						ArrayList<IConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(curr_token);
+						namedEntityStringTreeMap.add(getConllFeatures(namedEntity, curr_token));
 					}
 					
 					break;
@@ -366,32 +414,20 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 	}
 	
 	/**
-	 * Return the BIO-code of the given annotation over the given as a string.
+	 * TODO: Comment
 	 *
 	 * @param namedEntity
 	 * @param token
-	 * @return BIO-code of the annotation over the token as string.
+	 * @return
 	 */
-	public ConllFeatures getFeatures(T namedEntity, Token token) {
-		ConllFeatures features = new ConllFeatures();
+	public IConllFeatures getConllFeatures(T namedEntity, Token token) {
+		IConllFeatures features = getEmptyConllFeatures();
 		if (namedEntity instanceof org.texttechnologylab.annotation.AbstractNamedEntity) {
 			features.name(namedEntity.getType().getShortName());
-			
-			AbstractNamedEntity ne = (AbstractNamedEntity) namedEntity;
-			features.setAbstract(true);
-			features.setMetaphor(ne.getMetaphor());
 		} else if (namedEntity instanceof org.texttechnologylab.annotation.type.Other) {
 			features.name(namedEntity.getType().getShortName());
-			
-			Other ne = (Other) namedEntity;
-			features.setAbstract(ne.getValue() != null && !ne.getValue().isEmpty());
-			features.setMetaphor(ne.getMetaphor());
 		} else if (namedEntity instanceof org.texttechnologylab.annotation.NamedEntity) {
 			features.name(namedEntity.getType().getShortName());
-			
-			NamedEntity ne = (NamedEntity) namedEntity;
-			features.setAbstract(false);
-			features.setMetaphor(ne.getMetaphor());
 		} else if (namedEntity instanceof de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity) {
 			String value = ((de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity) namedEntity).getValue();
 			if (value == null) {
@@ -405,7 +441,7 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 			features.name("<UNK>");
 		}
 		if (features.isNameInvalid())
-			return new ConllFeatures("O");
+			return new SingleConllFeatures("O");
 		if (namedEntity.getBegin() == token.getBegin() == useIOB2) {
 			features.prependTag("B-");
 		} else {
@@ -415,7 +451,7 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 	}
 	
 	public ArrayList<String> getFeatures(Token token) {
-		return getFeatures(token, Strategy.byIndex(1));
+		return getFeatures(token, Strategy.MaxCoverage);
 	}
 	
 	public ArrayList<String> getFeatures(int index, int strategyIndex) {
@@ -427,36 +463,49 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 	}
 	
 	public ArrayList<String> getFeatures(Token token, Strategy strategy) {
+		return getFeaturesForNColumns(token, strategy, 1);
+	}
+	
+	public ArrayList<String> getFeaturesForNColumns(Token token, int strategyIndex, int nColumns) {
+		return getFeaturesForNColumns(token, Strategy.byIndex(strategyIndex), nColumns);
+	}
+	
+	public ArrayList<String> getFeaturesForNColumns(Token token, Strategy strategy, int nColumns) {
 		ArrayList<String> retList = new ArrayList<>();
 		
-		ArrayList<ConllFeatures> neList;
-		ArrayList<ConllFeatures> conllFeatures = hierachialTokenNamedEntityMap.get(token);
-		if (conllFeatures == null) return retList;
-		switch (strategy) {
-			default:
-			case TopFirstBottomUp: /// FIXME
-			case TopDown:
-				neList = new ArrayList<>(conllFeatures);
-				if (neList.isEmpty())
-					break;
-				retList.addAll(neList.get(0).build());
-				break;
-//			case TopDown:
-//				retList = new ArrayList<>(hierachialTokenNamedEntityMap.get(token));
-//				break;
-			case BottomUp:
-				retList = Lists.reverse(conllFeatures).get(0).build();
-				break;
-			case MaxCoverage:
-				Integer index = maxCoverageOrder.get(0);
-				try {
-					retList = conllFeatures.get(index).build();
-				} catch (NullPointerException e) {
-					e.printStackTrace();
+		ArrayList<IConllFeatures> IConllFeatures = hierachialTokenNamedEntityMap.get(token);
+		if (IConllFeatures == null) return retList;
+		for (int i = 0; i < Math.min(nColumns, IConllFeatures.size()); i++) {
+			try {
+				switch (strategy) {
+					case TopFirstBottomUp:
+						strategy = Strategy.BottomUp;
+					case TopDown:
+						retList.addAll(IConllFeatures.get(i).build());
+						break;
+					case BottomUp:
+						retList.addAll(Lists.reverse(IConllFeatures).get(i).build());
+						break;
+					case MaxCoverage:
+						if (i < maxCoverageOrder.size()) {
+							Integer index = maxCoverageOrder.get(i);
+							retList.addAll(IConllFeatures.get(index).build());
+						} else {
+							retList.addAll(getEmptyConllFeatures().build());
+						}
 				}
+			} catch (NullPointerException e) {
+				e.printStackTrace();
+				retList.addAll(getEmptyConllFeatures().build());
+			}
 		}
 		
 		return retList;
+	}
+	
+	@NotNull
+	IConllFeatures getEmptyConllFeatures() {
+		return new SingleConllFeatures();
 	}
 	
 	public JCas getMergedCas() {
@@ -484,5 +533,25 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 			}
 			throw new IndexOutOfBoundsException(String.format("The strategy index %d is out of bounds!", i));
 		}
+	}
+	
+	public void setFilterFingerprinted(boolean filterFingerprinted) {
+		this.filterFingerprinted = filterFingerprinted;
+	}
+	
+	public void setRemoveDuplicateSameType(boolean removeDuplicateSameType) {
+		this.removeDuplicateSameType = removeDuplicateSameType;
+	}
+	
+	public void setRemoveDuplicateConstrainBegin(boolean removeDuplicateConstrainBegin) {
+		this.removeDuplicateConstrainBegin = removeDuplicateConstrainBegin;
+	}
+	
+	public void setRemoveDuplicateConstrainEnd(boolean removeDuplicateConstrainEnd) {
+		this.removeDuplicateConstrainEnd = removeDuplicateConstrainEnd;
+	}
+	
+	public void setAnnotatorRelation(boolean annotatorRelation) {
+		this.annotatorRelation = annotatorRelation;
 	}
 }

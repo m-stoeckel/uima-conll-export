@@ -12,13 +12,15 @@ import org.apache.uima.jcas.JCas;
 import org.apache.uima.jcas.cas.TOP;
 import org.apache.uima.jcas.tcas.Annotation;
 import org.apache.uima.util.CasCopier;
+import org.jetbrains.annotations.NotNull;
 import org.texttechnologylab.annotation.AbstractNamedEntity;
 import org.texttechnologylab.annotation.NamedEntity;
 import org.texttechnologylab.annotation.type.Fingerprint;
 import org.texttechnologylab.annotation.type.Other;
 import org.texttechnologylab.annotation.type.Taxon;
 import org.texttechnologylab.annotation.type.TexttechnologyNamedEntity;
-import org.texttechnologylab.uima.conll.extractor.ConllFeatures;
+import org.texttechnologylab.uima.conll.extractor.TTLabConllFeatures;
+import org.texttechnologylab.uima.conll.extractor.IConllFeatures;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -31,42 +33,35 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 	/**
 	 * DKProHierarchicalBioEncoder that filters for fingerprinted annotations and includes all {@link Taxon} annotations
 	 * by default
-	 * <p>See {@link TTLabHierarchicalIobEncoder#TTLabHierarchicalIobEncoder(JCas, boolean, ArrayList, ImmutableSet,
-	 * boolean)}.
+	 * <p>See {@link #TTLabHierarchicalIobEncoder(JCas, ArrayList, ImmutableSet)}.
 	 *
 	 * @param jCas The JCas to process.
 	 */
 	public TTLabHierarchicalIobEncoder(JCas jCas) {
-		this(jCas, true, Lists.newArrayList(NamedEntity.class, AbstractNamedEntity.class), ImmutableSet.of(), false);
+		this(jCas, Lists.newArrayList(NamedEntity.class, AbstractNamedEntity.class), ImmutableSet.of());
 	}
 	
 	/**
 	 * DKProHierarchicalBioEncoder that includes all {@link Taxon} annotations by default
-	 * <p>See {@link TTLabHierarchicalIobEncoder#TTLabHierarchicalIobEncoder(JCas, boolean, ArrayList, ImmutableSet,
-	 * boolean)}.
+	 * <p>See {@link #TTLabHierarchicalIobEncoder(JCas, ArrayList, ImmutableSet)}.
 	 *
-	 * @param jCas                 The JCas to process.
-	 * @param pFilterFingerprinted If true, only fingerprinted {@link NamedEntity NamedEntities} are processed.
+	 * @param jCas         The JCas to process.
 	 * @param annotatorSet
-	 * @param annotatorRelation
 	 */
-	public TTLabHierarchicalIobEncoder(JCas jCas, boolean pFilterFingerprinted, ImmutableSet<String> annotatorSet, boolean annotatorRelation) {
-		this(jCas, pFilterFingerprinted, Lists.newArrayList(NamedEntity.class, AbstractNamedEntity.class), annotatorSet, annotatorRelation);
+	public TTLabHierarchicalIobEncoder(JCas jCas, ImmutableSet<String> annotatorSet) {
+		this(jCas, Lists.newArrayList(NamedEntity.class, AbstractNamedEntity.class), annotatorSet);
 	}
 	
 	/**
 	 * An encoder for the BIO-/IOB2-format that can handle an arbitrary number of stacked annotations.
 	 *
-	 * @param jCas                 The JCas to process.
-	 * @param pFilterFingerprinted If true, only fingerprinted {@link NamedEntity NamedEntities} are processed.
-	 * @param includeAnnotations   Include all annotations of these classes.
+	 * @param jCas               The JCas to process.
+	 * @param includeAnnotations Include all annotations of these classes.
 	 * @param annotatorSet
-	 * @param annotatorRelation
 	 */
-	public TTLabHierarchicalIobEncoder(JCas jCas, boolean pFilterFingerprinted, ArrayList<Class<? extends Annotation>> includeAnnotations, ImmutableSet<String> annotatorSet, boolean annotatorRelation) {
-		super(jCas, pFilterFingerprinted, includeAnnotations, annotatorSet, annotatorRelation);
+	public TTLabHierarchicalIobEncoder(JCas jCas, ArrayList<Class<? extends Annotation>> includeAnnotations, ImmutableSet<String> annotatorSet) {
+		super(jCas, includeAnnotations, annotatorSet);
 		this.type = Annotation.class;
-		this.build();
 	}
 	
 	/**
@@ -85,32 +80,35 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 			namedEntities.addAll(select(mergedCas, AbstractNamedEntity.class));
 			
 			// Flatten the new view by removing identical duplicates
-			final LinkedHashSet<Annotation> flattenedNamedEntities = new LinkedHashSet<>(namedEntities);
-			for (Annotation parentNamedEntity : namedEntities) {
-				JCasUtil.subiterate(mergedCas, type, parentNamedEntity, false, true)
-						.forEach(childNamedEntity -> {
-							if (flattenedNamedEntities.contains(childNamedEntity)
-									&& parentNamedEntity.getBegin() == childNamedEntity.getBegin()
-									&& parentNamedEntity.getEnd() == childNamedEntity.getEnd()
-									&& parentNamedEntity.getType() == childNamedEntity.getType())
-								flattenedNamedEntities.remove(childNamedEntity);
-						});
+			if (removeDuplicateSameType) {
+				LinkedHashSet<Annotation> iterNamedEntities = (LinkedHashSet<Annotation>) namedEntities.clone();
+				for (Annotation parentNamedEntity : iterNamedEntities) {
+					JCasUtil.subiterate(mergedCas, type, parentNamedEntity, false, true)
+							.forEach(childNamedEntity -> {
+								if (namedEntities.contains(childNamedEntity)
+										&& parentNamedEntity.getType() == childNamedEntity.getType()
+										&& (!removeDuplicateConstrainBegin || parentNamedEntity.getBegin() == childNamedEntity.getBegin())
+										&& (!removeDuplicateConstrainEnd || parentNamedEntity.getEnd() == childNamedEntity.getEnd())
+								)
+									namedEntities.remove(childNamedEntity);
+							});
+				}
 			}
 			
 			// Initialize the hierarchy
-			flattenedNamedEntities.forEach(key -> namedEntityHierachy.put(key, 0L));
+			namedEntities.forEach(key -> namedEntityHierachy.put(key, 0L));
 			
 			// Iterate over all NEs that are being covered by another NE
 			// and set their hierarchy level to their parents level + 1
-			for (Annotation parentNamedEntity : flattenedNamedEntities) {
+			for (Annotation parentNamedEntity : namedEntities) {
 				JCasUtil.subiterate(mergedCas, NamedEntity.class, parentNamedEntity, true, false)
 						.forEach(childNamedEntity -> {
-							if (flattenedNamedEntities.contains(childNamedEntity))
+							if (namedEntities.contains(childNamedEntity))
 								namedEntityHierachy.put(childNamedEntity, namedEntityHierachy.get(parentNamedEntity) + 1);
 						});
 				JCasUtil.subiterate(mergedCas, AbstractNamedEntity.class, parentNamedEntity, true, false)
 						.forEach(childNamedEntity -> {
-							if (flattenedNamedEntities.contains(childNamedEntity))
+							if (namedEntities.contains(childNamedEntity))
 								namedEntityHierachy.put(childNamedEntity, namedEntityHierachy.get(parentNamedEntity) + 1);
 						});
 			}
@@ -135,8 +133,8 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 				breadthFirstSearch(mergedCas, tokens);
 			} else {
 				for (Token token : tokens) {
-					ArrayList<ConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(token);
-					namedEntityStringTreeMap.add(new ConllFeatures());
+					ArrayList<IConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(token);
+					namedEntityStringTreeMap.add(getEmptyConllFeatures());
 				}
 			}
 			
@@ -244,8 +242,8 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 				Collection<Token> coveredTokens = tokenNeIndex.get(namedEntity);
 				// If its not already covered, add this Named Entity to the tokens NE hierarchy
 				for (Token coveredToken : coveredTokens) {
-					ArrayList<ConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(coveredToken);
-					namedEntityStringTreeMap.add(getFeatures(namedEntity, coveredToken));
+					ArrayList<IConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(coveredToken);
+					namedEntityStringTreeMap.add(getConllFeatures(namedEntity, coveredToken));
 				}
 				visitedTokens.addAll(coveredTokens);
 				visitedEntities.add(namedEntity);
@@ -263,8 +261,8 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 						continue;
 					// If its not already covered, add this Named Entity to the tokens NE hierarchy
 					for (Token coveredToken : coveredTokens) {
-						ArrayList<ConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(coveredToken);
-						namedEntityStringTreeMap.add(getFeatures(namedEntity, coveredToken));
+						ArrayList<IConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(coveredToken);
+						namedEntityStringTreeMap.add(getConllFeatures(namedEntity, coveredToken));
 					}
 					visitedTokens.addAll(coveredTokens);
 					visitedEntities.add(namedEntity);
@@ -276,25 +274,25 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 			ArrayList<Token> notCoveredTokens = new ArrayList<>(tokens);
 			notCoveredTokens.removeAll(visitedTokens);
 			for (Token notCoveredToken : notCoveredTokens) {
-				ArrayList<ConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(notCoveredToken);
-				namedEntityStringTreeMap.add(new ConllFeatures());
+				ArrayList<IConllFeatures> namedEntityStringTreeMap = hierachialTokenNamedEntityMap.get(notCoveredToken);
+				namedEntityStringTreeMap.add(getEmptyConllFeatures());
 			}
 		}
 		
 		int lastIndex = rankSets.size() - 1;
-		if (lastIndex >= 0 && hierachialTokenNamedEntityMap.values().stream().allMatch(l -> l.get(lastIndex).equals(new ConllFeatures())))
+		if (lastIndex >= 0 && hierachialTokenNamedEntityMap.values().stream().allMatch(l -> l.get(lastIndex).equals(getEmptyConllFeatures())))
 			hierachialTokenNamedEntityMap.values().forEach(l -> l.remove(lastIndex));
 	}
 	
 	/**
-	 * Return the BIO-code of the given annotation over the given as a string.
+	 * TODO: Comment
 	 *
 	 * @param namedEntity
 	 * @param token
-	 * @return BIO-code of the annotation over the token as string.
+	 * @return
 	 */
-	public ConllFeatures getFeatures(Annotation namedEntity, Token token) {
-		ConllFeatures features = new ConllFeatures();
+	public IConllFeatures getConllFeatures(Annotation namedEntity, Token token) {
+		TTLabConllFeatures features = (TTLabConllFeatures) getEmptyConllFeatures();
 		if (namedEntity instanceof org.texttechnologylab.annotation.AbstractNamedEntity) {
 			features.name(namedEntity.getType().getShortName());
 			
@@ -319,13 +317,19 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 			features.name("<UNK>");
 		}
 		if (features.isNameInvalid())
-			return new ConllFeatures("O");
+			return getEmptyConllFeatures();
 		if (namedEntity.getBegin() == token.getBegin() == useIOB2) {
 			features.prependTag("B-");
 		} else {
 			features.prependTag("I-");
 		}
 		return features;
+	}
+	
+	@NotNull
+	@Override
+	IConllFeatures getEmptyConllFeatures() {
+		return new TTLabConllFeatures();
 	}
 	
 }

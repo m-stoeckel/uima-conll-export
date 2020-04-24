@@ -3,35 +3,40 @@ package org.texttechnologylab.uima.conll.extractor;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-public class ConllFeatures extends ArrayList<String> {
+public class TTLabConllFeatures extends ArrayList<String> implements IConllFeatures {
 	
 	private String prependTag = "";
 	
-	public ConllFeatures() {
+	public TTLabConllFeatures() {
 		super(Arrays.asList("O", "", ""));
 	}
 	
-	public ConllFeatures(String initalElement) {
+	public TTLabConllFeatures(String initalElement) {
 		super(Arrays.asList("", "", ""));
 		this.name(initalElement);
 	}
 	
+	@Override
 	public void name(String name) {
 		this.set(0, name.replaceAll("([IB]-)*", ""));
 	}
 	
+	@Override
 	public String name() {
 		return this.get(0);
 	}
 	
+	@Override
 	public void prependTag(String tag) {
 		this.prependTag = tag;
 	}
 	
-	public String prependTag() {
+	@Override
+	public String getPrependTag() {
 		return prependTag;
 	}
 	
+	@Override
 	public boolean isNameInvalid() {
 		return this.get(0) == null || this.get(0).isEmpty();
 	}
@@ -43,7 +48,7 @@ public class ConllFeatures extends ArrayList<String> {
 			this.set(1, "<CONCRETE>");
 	}
 	
-	public boolean setAbstract() {
+	public boolean isAbstract() {
 		return this.get(1).equals("<ABSTRACT>");
 	}
 	
@@ -55,10 +60,11 @@ public class ConllFeatures extends ArrayList<String> {
 		
 	}
 	
-	public boolean setMetaphor() {
+	public boolean isMetaphor() {
 		return this.get(2).equals("<ABSTRACT>");
 	}
 	
+	@Override
 	public ArrayList<String> build() {
 		ArrayList<String> retList = new ArrayList<>();
 		retList.add(this.prependTag + this.name());
@@ -69,6 +75,7 @@ public class ConllFeatures extends ArrayList<String> {
 		return retList;
 	}
 	
+	@Override
 	public boolean isOut() {
 		return this.get(0) == null || this.get(0).isEmpty() || this.get(0).equals("O");
 	}

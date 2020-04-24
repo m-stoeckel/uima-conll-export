@@ -194,7 +194,10 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 					// Check if there are categories with high enough agreement
 					if (!filteredCategories.isEmpty()) {
 						if (pUseTTLabTypesystem) {
-							TTLabHierarchicalIobEncoder hierarchicalBioEncoder = new TTLabHierarchicalIobEncoder(aJCas, pFilterFingerprinted, filteredCategories, validViewNames, pAnnotatorRelation);
+							TTLabHierarchicalIobEncoder hierarchicalBioEncoder = new TTLabHierarchicalIobEncoder(aJCas, filteredCategories, validViewNames);
+							hierarchicalBioEncoder.setAnnotatorRelation(pAnnotatorRelation);
+							hierarchicalBioEncoder.setFilterFingerprinted(pFilterFingerprinted);
+							hierarchicalBioEncoder.build();
 							if (hierarchicalBioEncoder.getNamedEntitiyCount() > 0) {
 								printConllFile(hierarchicalBioEncoder);
 							} else {
@@ -202,7 +205,10 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 								return;
 							}
 						} else {
-							DKProHierarchicalIobEncoder hierarchicalBioEncoder = new DKProHierarchicalIobEncoder(aJCas, pFilterFingerprinted, filteredCategories, validViewNames, pAnnotatorRelation);
+							DKProHierarchicalIobEncoder hierarchicalBioEncoder = new DKProHierarchicalIobEncoder(aJCas, filteredCategories, validViewNames);
+							hierarchicalBioEncoder.setAnnotatorRelation(pAnnotatorRelation);
+							hierarchicalBioEncoder.setFilterFingerprinted(pFilterFingerprinted);
+							hierarchicalBioEncoder.build();
 							if (hierarchicalBioEncoder.getNamedEntitiyCount() > 0) {
 								printConllFile(hierarchicalBioEncoder);
 							} else {
@@ -216,7 +222,10 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 				} else { // No IAA filtering
 					if (validViewNames.size() >= pMinViews) { // .. but at least the required number of views
 						if (pUseTTLabTypesystem) {
-							TTLabHierarchicalIobEncoder hierarchicalBioEncoder = new TTLabHierarchicalIobEncoder(aJCas, pFilterFingerprinted, validViewNames, pAnnotatorRelation);
+							TTLabHierarchicalIobEncoder hierarchicalBioEncoder = new TTLabHierarchicalIobEncoder(aJCas, validViewNames);
+							hierarchicalBioEncoder.setAnnotatorRelation(pAnnotatorRelation);
+							hierarchicalBioEncoder.setFilterFingerprinted(pFilterFingerprinted);
+							hierarchicalBioEncoder.build();
 							if (hierarchicalBioEncoder.getNamedEntitiyCount() > 0) {
 								printConllFile(hierarchicalBioEncoder);
 							} else {
@@ -224,7 +233,10 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 								return;
 							}
 						} else {
-							DKProHierarchicalIobEncoder hierarchicalBioEncoder = new DKProHierarchicalIobEncoder(aJCas, pFilterFingerprinted, validViewNames, pAnnotatorRelation);
+							DKProHierarchicalIobEncoder hierarchicalBioEncoder = new DKProHierarchicalIobEncoder(aJCas, validViewNames);
+							hierarchicalBioEncoder.setAnnotatorRelation(pAnnotatorRelation);
+							hierarchicalBioEncoder.setFilterFingerprinted(pFilterFingerprinted);
+							hierarchicalBioEncoder.build();
 							if (hierarchicalBioEncoder.getNamedEntitiyCount() > 0) {
 								printConllFile(hierarchicalBioEncoder);
 							} else {
@@ -295,10 +307,18 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 						}
 					}
 					
-					row.entities = hierarchicalBioEncoder.getFeatures(token, pEncoderStrategyIndex);
-					if (!row.entities.isEmpty() && !ImmutableSet.of("O", "B-O").contains(row.entities.get(0))) {
-						entityCount++;
+					if (pNamedEntityColumns < 2) {
+						row.entities = hierarchicalBioEncoder.getFeatures(token, pEncoderStrategyIndex);
+						if (!row.entities.isEmpty() && !ImmutableSet.of("O", "B-O").contains(row.entities.get(0))) {
+							entityCount++;
+						}
+					} else {
+						row.entities = hierarchicalBioEncoder.getFeaturesForNColumns(token, pEncoderStrategyIndex, pNamedEntityColumns);
+						if (!row.entities.isEmpty() && !ImmutableSet.of("O", "B-O").contains(row.entities.get(0))) {
+							entityCount++;
+						}
 					}
+					
 					ctokens.put(row.token, row);
 				}
 				

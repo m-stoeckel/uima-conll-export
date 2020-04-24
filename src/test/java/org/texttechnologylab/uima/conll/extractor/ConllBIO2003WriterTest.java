@@ -33,25 +33,21 @@ public class ConllBIO2003WriterTest {
 		try {
 			JCas jCas = getjCas();
 			
-			DKProHierarchicalIobEncoder encoder = new DKProHierarchicalIobEncoder(jCas, false);
+			DKProHierarchicalIobEncoder encoder = new DKProHierarchicalIobEncoder(jCas);
+			encoder.setRemoveDuplicateSameType(false);
+			encoder.setFilterFingerprinted(false);
+			encoder.build();
 			
-			ArrayList<Token> tokens = Lists.newArrayList(JCasUtil.select(jCas, Token.class));
-			for (int i = 0; i < tokens.size(); i++) {
-				System.out.printf("%s %s\n", tokens.get(i).getCoveredText(), encoder.getFeatures(i, 0));
+			ArrayList<Token> tokens = Lists.newArrayList(JCasUtil.select(encoder.getMergedCas(), Token.class));
+			for (int strategy = 0; strategy < 4; strategy++) {
+				for (Token token : tokens) {
+					System.out.printf("%s %s\n",
+							token.getCoveredText(),
+							encoder.getFeaturesForNColumns(token, strategy, 4)
+					);
+				}
+				System.out.println();
 			}
-			System.out.println();
-			for (int i = 0; i < tokens.size(); i++) {
-				System.out.printf("%s %s\n", tokens.get(i).getCoveredText(), encoder.getFeatures(i, 1));
-			}
-			System.out.println();
-			for (int i = 0; i < tokens.size(); i++) {
-				System.out.printf("%s %s\n", tokens.get(i).getCoveredText(), encoder.getFeatures(i, 2));
-			}
-			System.out.println();
-			for (int i = 0; i < tokens.size(); i++) {
-				System.out.printf("%s %s\n", tokens.get(i).getCoveredText(), encoder.getFeatures(i, 3));
-			}
-			System.out.println();
 		} catch (UIMAException e) {
 			e.printStackTrace();
 		}
