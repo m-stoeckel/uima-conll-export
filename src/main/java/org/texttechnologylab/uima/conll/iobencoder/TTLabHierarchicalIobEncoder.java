@@ -31,42 +31,35 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 	/**
 	 * DKProHierarchicalBioEncoder that filters for fingerprinted annotations and includes all {@link Taxon} annotations
 	 * by default
-	 * <p>See {@link TTLabHierarchicalIobEncoder#TTLabHierarchicalIobEncoder(JCas, boolean, ArrayList, ImmutableSet,
-	 * boolean)}.
+	 * <p>See {@link #TTLabHierarchicalIobEncoder(JCas, ArrayList, ImmutableSet)}.
 	 *
 	 * @param jCas The JCas to process.
 	 */
 	public TTLabHierarchicalIobEncoder(JCas jCas) {
-		this(jCas, true, Lists.newArrayList(NamedEntity.class, AbstractNamedEntity.class), ImmutableSet.of(), false);
+		this(jCas, Lists.newArrayList(NamedEntity.class, AbstractNamedEntity.class), ImmutableSet.of());
 	}
 	
 	/**
 	 * DKProHierarchicalBioEncoder that includes all {@link Taxon} annotations by default
-	 * <p>See {@link TTLabHierarchicalIobEncoder#TTLabHierarchicalIobEncoder(JCas, boolean, ArrayList, ImmutableSet,
-	 * boolean)}.
+	 * <p>See {@link #TTLabHierarchicalIobEncoder(JCas, ArrayList, ImmutableSet)}.
 	 *
-	 * @param jCas                 The JCas to process.
-	 * @param pFilterFingerprinted If true, only fingerprinted {@link NamedEntity NamedEntities} are processed.
+	 * @param jCas         The JCas to process.
 	 * @param annotatorSet
-	 * @param annotatorRelation
 	 */
-	public TTLabHierarchicalIobEncoder(JCas jCas, boolean pFilterFingerprinted, ImmutableSet<String> annotatorSet, boolean annotatorRelation) {
-		this(jCas, pFilterFingerprinted, Lists.newArrayList(NamedEntity.class, AbstractNamedEntity.class), annotatorSet, annotatorRelation);
+	public TTLabHierarchicalIobEncoder(JCas jCas, ImmutableSet<String> annotatorSet) {
+		this(jCas, Lists.newArrayList(NamedEntity.class, AbstractNamedEntity.class), annotatorSet);
 	}
 	
 	/**
 	 * An encoder for the BIO-/IOB2-format that can handle an arbitrary number of stacked annotations.
 	 *
-	 * @param jCas                 The JCas to process.
-	 * @param pFilterFingerprinted If true, only fingerprinted {@link NamedEntity NamedEntities} are processed.
-	 * @param includeAnnotations   Include all annotations of these classes.
+	 * @param jCas               The JCas to process.
+	 * @param includeAnnotations Include all annotations of these classes.
 	 * @param annotatorSet
-	 * @param annotatorRelation
 	 */
-	public TTLabHierarchicalIobEncoder(JCas jCas, boolean pFilterFingerprinted, ArrayList<Class<? extends Annotation>> includeAnnotations, ImmutableSet<String> annotatorSet, boolean annotatorRelation) {
-		super(jCas, pFilterFingerprinted, includeAnnotations, annotatorSet, annotatorRelation);
+	public TTLabHierarchicalIobEncoder(JCas jCas, ArrayList<Class<? extends Annotation>> includeAnnotations, ImmutableSet<String> annotatorSet) {
+		super(jCas, includeAnnotations, annotatorSet);
 		this.type = Annotation.class;
-		this.build();
 	}
 	
 	/**
@@ -90,9 +83,10 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 				JCasUtil.subiterate(mergedCas, type, parentNamedEntity, false, true)
 						.forEach(childNamedEntity -> {
 							if (flattenedNamedEntities.contains(childNamedEntity)
-									&& parentNamedEntity.getBegin() == childNamedEntity.getBegin()
+									&& (!removeDuplicateSameType || parentNamedEntity.getType() == childNamedEntity.getType())
+									&& (parentNamedEntity.getBegin() == childNamedEntity.getBegin())
 									&& parentNamedEntity.getEnd() == childNamedEntity.getEnd()
-									&& parentNamedEntity.getType() == childNamedEntity.getType())
+							)
 								flattenedNamedEntities.remove(childNamedEntity);
 						});
 			}

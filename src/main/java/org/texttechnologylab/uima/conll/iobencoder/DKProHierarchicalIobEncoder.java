@@ -21,38 +21,33 @@ public class DKProHierarchicalIobEncoder extends GenericIobEncoder<NamedEntity> 
 	/**
 	 * DKProHierarchicalBioEncoder that filters for fingerprinted annotations and includes all {@link NamedEntity}
 	 * annotations by default
-	 * <p>See {@link DKProHierarchicalIobEncoder#DKProHierarchicalIobEncoder(JCas, boolean, ArrayList, ImmutableSet,
-	 * Boolean)}.
+	 * <p>See {@link #DKProHierarchicalIobEncoder(JCas, ArrayList, ImmutableSet)}.
 	 *
 	 * @param jCas The JCas to process.
 	 */
-	public DKProHierarchicalIobEncoder(JCas jCas, boolean pFilterFingerprinted) {
-		this(jCas, pFilterFingerprinted, Lists.newArrayList(NamedEntity.class), ImmutableSet.of(), false);
+	public DKProHierarchicalIobEncoder(JCas jCas) {
+		this(jCas, Lists.newArrayList(NamedEntity.class), ImmutableSet.of());
 	}
 	
 	/**
 	 * DKProHierarchicalBioEncoder that includes all {@link NamedEntity} annotations by default
-	 * <p>See {@link DKProHierarchicalIobEncoder#DKProHierarchicalIobEncoder(JCas, boolean, ArrayList, ImmutableSet,
-	 * Boolean)}.
+	 * <p>See {@link #DKProHierarchicalIobEncoder(JCas, ArrayList, ImmutableSet)}.
 	 *
-	 * @param jCas                 The JCas to process.
-	 * @param pFilterFingerprinted If true, only fingerprinted {@link NamedEntity NamedEntities} are processed.
+	 * @param jCas The JCas to process.
 	 */
-	public DKProHierarchicalIobEncoder(JCas jCas, boolean pFilterFingerprinted, ImmutableSet<String> annotatorList, Boolean annotatorRelation) {
-		this(jCas, pFilterFingerprinted, Lists.newArrayList(NamedEntity.class), annotatorList, annotatorRelation);
+	public DKProHierarchicalIobEncoder(JCas jCas, ImmutableSet<String> annotatorList) {
+		this(jCas, Lists.newArrayList(NamedEntity.class), annotatorList);
 	}
 	
 	/**
 	 * An encoder for the BIO-/IOB2-format that can handle an arbitrary number of stacked annotations.
 	 *
-	 * @param jCas                 The JCas to process.
-	 * @param pFilterFingerprinted If true, only fingerprinted {@link NamedEntity NamedEntities} are processed.
-	 * @param forceAnnotations     Include all annotations of these classes.
+	 * @param jCas             The JCas to process.
+	 * @param forceAnnotations Include all annotations of these classes.
 	 */
-	public DKProHierarchicalIobEncoder(JCas jCas, boolean pFilterFingerprinted, ArrayList<Class<? extends Annotation>> forceAnnotations, ImmutableSet<String> annotatorList, Boolean annotatorRelation) {
-		super(jCas, pFilterFingerprinted, forceAnnotations, annotatorList, annotatorRelation);
+	public DKProHierarchicalIobEncoder(JCas jCas, ArrayList<Class<? extends Annotation>> forceAnnotations, ImmutableSet<String> annotatorList) {
+		super(jCas, forceAnnotations, annotatorList);
 		this.type = NamedEntity.class;
-		this.build();
 	}
 	
 	@Override

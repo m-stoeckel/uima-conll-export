@@ -16,8 +16,8 @@ import org.texttechnologylab.annotation.NamedEntity;
 import org.texttechnologylab.annotation.type.Fingerprint;
 import org.texttechnologylab.annotation.type.Other;
 import org.texttechnologylab.annotation.type.TexttechnologyNamedEntity;
-import org.texttechnologylab.utilities.collections.CountMap;
 import org.texttechnologylab.uima.conll.extractor.ConllFeatures;
+import org.texttechnologylab.utilities.collections.CountMap;
 
 import java.util.*;
 import java.util.function.Function;
@@ -29,21 +29,56 @@ import static org.apache.uima.fit.util.JCasUtil.*;
 public abstract class GenericIobEncoder<T extends Annotation> {
 	final HashMap<Token, ArrayList<ConllFeatures>> hierachialTokenNamedEntityMap;
 	final CountMap<T> namedEntityHierachy;
-	final boolean filterFingerprinted;
 	final JCas jCas;
 	final ArrayList<Class<? extends Annotation>> forceAnnotations;
 	final TreeMap<Integer, Token> tokenIndexMap;
 	
 	protected JCas mergedCas;
 	
+	/**
+	 * The base type of {@link Annotation Annotations} to iterate over.
+	 */
 	Class<T> type;
+	
 	/**
 	 * Set false to use IOB-1 format.
 	 */
-	boolean useIOB2; // FIXME
+	boolean useIOB2 = true; // FIXME
+	
+	/**
+	 * If true, filter all annotations by those covered by a {@link Fingerprint} annotation. Default: true.
+	 */
+	boolean filterFingerprinted = true;
+	
+	/**
+	 * If true, remove overlapping duplicate entries from multiple views of the same type. Default: true.
+	 */
+	boolean removeDuplicateSameType = true;
+	
+	/**
+	 * If true, remove overlapping duplicate entries from multiple views of the same type <b>only</b> if they start at
+	 * the same token. Default: true.
+	 */
+	boolean removeDuplicateConstrainBegin = true;
+	
+	/**
+	 * If true, remove overlapping duplicate entries from multiple views of the same type <b>only</b> if they end at the
+	 * same token. Default: false
+	 */
+	boolean removeDuplicateConstrainEnd = false;
+	
+	/**
+	 * The annotator relation can either be to {@link #BLACKLIST} or to {@link #WHITELIST} the anntotators in the {@link
+	 * #annotatorSet}. Default: {@link #BLACKLIST}
+	 */
+	boolean annotatorRelation = BLACKLIST;
+	public static boolean WHITELIST = true;
+	public static boolean BLACKLIST = false;
+	
 	TreeMap<Long, TreeSet<T>> namedEntityByRank;
 	ArrayList<Integer> maxCoverageOrder;
-	public LinkedHashMap<Integer, Long> coverageCount;
+	
+	public LinkedHashMap<Integer, Long> coverageCount = new LinkedHashMap<>();
 	
 	Comparator<Annotation> beginComparator = Comparator.comparingInt(Annotation::getBegin);
 	private Comparator<Annotation> hierachialComparator = new Comparator<Annotation>() {
@@ -55,24 +90,21 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 		}
 	};
 	final ImmutableSet<String> annotatorSet;
-	final boolean annotatorRelation;
 	
 	
-	protected GenericIobEncoder(JCas jCas, boolean pFilterFingerprinted, ImmutableSet<String> annotatorSet) {
-		this(jCas, false, new ArrayList<>(), annotatorSet, true);
+	protected GenericIobEncoder(JCas jCas, ImmutableSet<String> annotatorSet) {
+		this(jCas, new ArrayList<>(), annotatorSet);
 	}
 	
-	GenericIobEncoder(JCas jCas, boolean pFilterFingerprinted, ArrayList<Class<? extends Annotation>> forceAnnotations, ImmutableSet<String> annotatorSet, boolean annotatorRelation) {
+	GenericIobEncoder(JCas jCas, ArrayList<Class<? extends Annotation>> forceAnnotations, ImmutableSet<String> annotatorSet) {
 		this.jCas = jCas;
+		this.forceAnnotations = forceAnnotations;
+		this.annotatorSet = annotatorSet;
+		
 		this.hierachialTokenNamedEntityMap = new HashMap<>();
 		this.namedEntityHierachy = new CountMap<>();
 		this.namedEntityByRank = new TreeMap<>();
-		this.useIOB2 = true;
-		this.filterFingerprinted = pFilterFingerprinted;
-		this.forceAnnotations = forceAnnotations;
 		this.tokenIndexMap = new TreeMap<>();
-		this.annotatorSet = annotatorSet;
-		this.annotatorRelation = annotatorRelation;
 	}
 	
 	
@@ -484,5 +516,25 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 			}
 			throw new IndexOutOfBoundsException(String.format("The strategy index %d is out of bounds!", i));
 		}
+	}
+	
+	public void setFilterFingerprinted(boolean filterFingerprinted) {
+		this.filterFingerprinted = filterFingerprinted;
+	}
+	
+	public void setRemoveDuplicateSameType(boolean removeDuplicateSameType) {
+		this.removeDuplicateSameType = removeDuplicateSameType;
+	}
+	
+	public void setRemoveDuplicateConstrainBegin(boolean removeDuplicateConstrainBegin) {
+		this.removeDuplicateConstrainBegin = removeDuplicateConstrainBegin;
+	}
+	
+	public void setRemoveDuplicateConstrainEnd(boolean removeDuplicateConstrainEnd) {
+		this.removeDuplicateConstrainEnd = removeDuplicateConstrainEnd;
+	}
+	
+	public void setAnnotatorRelation(boolean annotatorRelation) {
+		this.annotatorRelation = annotatorRelation;
 	}
 }

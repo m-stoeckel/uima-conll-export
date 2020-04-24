@@ -33,7 +33,7 @@ public class ConllBIO2003WriterTest {
 		try {
 			JCas jCas = getjCas();
 			
-			DKProHierarchicalIobEncoder encoder = new DKProHierarchicalIobEncoder(jCas, false);
+			DKProHierarchicalIobEncoder encoder = new DKProHierarchicalIobEncoder(jCas);
 			
 			ArrayList<Token> tokens = Lists.newArrayList(JCasUtil.select(jCas, Token.class));
 			for (int i = 0; i < tokens.size(); i++) {
