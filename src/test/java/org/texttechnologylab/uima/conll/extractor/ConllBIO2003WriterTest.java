@@ -20,11 +20,13 @@ import org.dkpro.core.io.xmi.XmiReader;
 import org.junit.Test;
 import org.texttechnologylab.agreement.engine.TTLabUnitizingIAACollectionProcessingEngine;
 import org.texttechnologylab.uima.conll.iobencoder.DKProHierarchicalIobEncoder;
+import org.texttechnologylab.uima.conll.iobencoder.GenericIobEncoder;
 
 import java.io.IOException;
 import java.util.ArrayList;
 
 import static org.texttechnologylab.agreement.engine.TTLabUnitizingIAACollectionProcessingEngine.*;
+import static org.texttechnologylab.uima.conll.iobencoder.GenericIobEncoder.Strategy.MaxCoverage;
 
 public class ConllBIO2003WriterTest {
 	
@@ -162,12 +164,14 @@ public class ConllBIO2003WriterTest {
 	@Test
 	public void exampleFile() {
 		try {
-//			String[] annotatorWhitelist = {"305236", "305235"};
+			String[] annotatorWhitelist = {"305236", "305235"};
+			String[] annotatorBlacklist = {"0", "303228"};
 			final AnalysisEngine agreementEngine = AnalysisEngineFactory.createEngine(
 					TTLabUnitizingIAACollectionProcessingEngine.class,
-//					PARAM_ANNOTATOR_LIST, annotatorWhitelist,
 //					PARAM_ANNOTATOR_RELATION, WHITELIST,
+//					PARAM_ANNOTATOR_LIST, annotatorWhitelist,
 					PARAM_ANNOTATOR_RELATION, BLACKLIST,
+					PARAM_ANNOTATOR_LIST, annotatorBlacklist,
 					PARAM_MULTI_CAS_HANDLING, SEPARATE,
 					PARAM_PRINT_STATS, false,
 					PARAM_MIN_VIEWS, 1,
@@ -180,13 +184,15 @@ public class ConllBIO2003WriterTest {
 					ConllBIO2003Writer.PARAM_TARGET_LOCATION, "src/test/out/",
 					ConllBIO2003Writer.PARAM_OVERWRITE, true,
 					ConllBIO2003Writer.PARAM_USE_TTLAB_TYPESYSTEM, true,
-					ConllBIO2003Writer.PARAM_STRATEGY_INDEX, 1,
-					ConllBIO2003Writer.PARAM_FILTER_FINGERPRINTED, true,
-//					ConllBIO2003Writer.PARAM_ANNOTATOR_LIST, annotatorWhitelist,
+					ConllBIO2003Writer.PARAM_STRATEGY_INDEX, MaxCoverage.ordinal(),
+					ConllBIO2003Writer.PARAM_NAMED_ENTITY_COLUMNS, 5,
+					ConllBIO2003Writer.PARAM_FILTER_FINGERPRINTED, false,
 //					ConllBIO2003Writer.PARAM_ANNOTATOR_RELATION, ConllBIO2003Writer.WHITELIST,
+//					ConllBIO2003Writer.PARAM_ANNOTATOR_LIST, annotatorWhitelist,
 					ConllBIO2003Writer.PARAM_ANNOTATOR_RELATION, ConllBIO2003Writer.BLACKLIST,
+					ConllBIO2003Writer.PARAM_ANNOTATOR_LIST, annotatorBlacklist,
 					ConllBIO2003Writer.PARAM_MIN_VIEWS, 1,
-					ConllBIO2003Writer.PARAM_FILTER_BY_AGREEMENT, 0.6F,
+//					ConllBIO2003Writer.PARAM_FILTER_BY_AGREEMENT, 0.6F,
 					ConllBIO2003Writer.PARAM_FILTER_EMPTY_SENTENCES, true);
 			
 			CollectionReader reader = CollectionReaderFactory.createReader(XmiReader.class,

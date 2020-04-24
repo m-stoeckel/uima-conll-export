@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import de.tudarmstadt.ukp.dkpro.core.api.metadata.type.DocumentMetaData;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.uima.UIMAException;
 import org.apache.uima.cas.CASException;
 import org.apache.uima.fit.factory.JCasFactory;
@@ -23,12 +24,15 @@ import org.texttechnologylab.uima.conll.extractor.TTLabConllFeatures;
 import org.texttechnologylab.uima.conll.extractor.IConllFeatures;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import static org.apache.uima.fit.util.JCasUtil.indexCovered;
 import static org.apache.uima.fit.util.JCasUtil.select;
 
 public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
+	
+	private boolean useTTLabConllFeatures = false;
 	
 	/**
 	 * DKProHierarchicalBioEncoder that filters for fingerprinted annotations and includes all {@link Taxon} annotations
@@ -81,18 +85,7 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 			
 			// Flatten the new view by removing identical duplicates
 			if (removeDuplicateSameType) {
-				LinkedHashSet<Annotation> iterNamedEntities = (LinkedHashSet<Annotation>) namedEntities.clone();
-				for (Annotation parentNamedEntity : iterNamedEntities) {
-					JCasUtil.subiterate(mergedCas, type, parentNamedEntity, false, true)
-							.forEach(childNamedEntity -> {
-								if (namedEntities.contains(childNamedEntity)
-										&& parentNamedEntity.getType() == childNamedEntity.getType()
-										&& (!removeDuplicateConstrainBegin || parentNamedEntity.getBegin() == childNamedEntity.getBegin())
-										&& (!removeDuplicateConstrainEnd || parentNamedEntity.getEnd() == childNamedEntity.getEnd())
-								)
-									namedEntities.remove(childNamedEntity);
-							});
-				}
+				removeDuplicates(namedEntities);
 			}
 			
 			// Initialize the hierarchy
@@ -147,20 +140,18 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 	@Override
 	void mergeViews() throws CASException {
 		CasCopier.copyCas(jCas.getCas(), mergedCas.getCas(), true, true);
-		jCas.removeAllIncludingSubtypes(NamedEntity.type);
-		jCas.removeAllIncludingSubtypes(AbstractNamedEntity.type);
-		
-		DocumentMetaData oDocumentMetaData = DocumentMetaData.get(jCas);
-		DocumentMetaData nDocumentMetaData = DocumentMetaData.create(mergedCas);
-		nDocumentMetaData.setDocumentId(oDocumentMetaData.getDocumentId());
-		nDocumentMetaData.setDocumentUri(oDocumentMetaData.getDocumentUri());
-		nDocumentMetaData.setDocumentBaseUri(oDocumentMetaData.getDocumentBaseUri());
-		nDocumentMetaData.setDocumentTitle(oDocumentMetaData.getDocumentTitle());
-		nDocumentMetaData.setCollectionId(oDocumentMetaData.getCollectionId());
-		nDocumentMetaData.setIsLastSegment(oDocumentMetaData.getIsLastSegment());
+		mergedCas.removeAllIncludingSubtypes(NamedEntity.type);
+		mergedCas.removeAllIncludingSubtypes(AbstractNamedEntity.type);
+		try {
+			DocumentMetaData.get(jCas);
+			DocumentMetaData.copy(jCas, mergedCas);
+		} catch (IllegalArgumentException ignored) {
+			// Empty catch block
+		}
 		
 		jCas.getViewIterator().forEachRemaining(viewCas -> {
-			if (annotatorRelation == annotatorSet.contains(viewCas.getViewName())) {
+			String viewName = StringUtils.substringAfterLast(viewCas.getViewName().trim(), "/");
+			if (annotatorRelation == annotatorSet.contains(viewName)) {
 				// Get all fingerprinted TOPs
 				HashSet<TOP> fingerprinted = select(viewCas, Fingerprint.class).stream()
 						.map(Fingerprint::getReference)
@@ -190,6 +181,15 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 				}
 			}
 		});
+		
+		// Remove all sub-tokens, ie. the halves of a tokens that were split by a hyphen.
+		ArrayList<Token> subTokens = new ArrayList<>();
+		JCasUtil.select(mergedCas, Token.class).forEach(
+				token -> JCasUtil.subiterate(mergedCas, Token.class, token, true, true).forEach(
+						subTokens::add
+				)
+		);
+		subTokens.forEach(mergedCas::removeFsFromIndexes);
 	}
 	
 	
@@ -292,6 +292,9 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 	 * @return
 	 */
 	public IConllFeatures getConllFeatures(Annotation namedEntity, Token token) {
+		if (!useTTLabConllFeatures)
+			return super.getConllFeatures(namedEntity, token);
+		
 		TTLabConllFeatures features = (TTLabConllFeatures) getEmptyConllFeatures();
 		if (namedEntity instanceof org.texttechnologylab.annotation.AbstractNamedEntity) {
 			features.name(namedEntity.getType().getShortName());
@@ -329,7 +332,13 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 	@NotNull
 	@Override
 	IConllFeatures getEmptyConllFeatures() {
-		return new TTLabConllFeatures();
+		if (!useTTLabConllFeatures)
+			return super.getEmptyConllFeatures();
+		else
+			return new TTLabConllFeatures();
 	}
 	
+	public void setUseTTLabConllFeatures(boolean useTTLabConllFeatures) {
+		this.useTTLabConllFeatures = useTTLabConllFeatures;
+	}
 }

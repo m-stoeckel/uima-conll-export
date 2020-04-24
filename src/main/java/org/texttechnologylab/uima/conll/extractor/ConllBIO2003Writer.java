@@ -125,6 +125,10 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 	@ConfigurationParameter(name = PARAM_USE_TTLAB_TYPESYSTEM, mandatory = false, defaultValue = "false")
 	private Boolean pUseTTLabTypesystem;
 	
+	public static final String PARAM_USE_TTLAB_CONLL_FEATURES = "pUseTTLabConllFeatures";
+	@ConfigurationParameter(name = PARAM_USE_TTLAB_CONLL_FEATURES, mandatory = false, defaultValue = "false")
+	private Boolean pUseTTLabConllFeatures;
+	
 	public static final String PARAM_ANNOTATOR_LIST = "pAnnotatorList";
 	@ConfigurationParameter(name = PARAM_ANNOTATOR_LIST, mandatory = false, defaultValue = "",
 			description = "Array of view names that should be considered during view merge..")
@@ -197,6 +201,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 							TTLabHierarchicalIobEncoder hierarchicalBioEncoder = new TTLabHierarchicalIobEncoder(aJCas, filteredCategories, validViewNames);
 							hierarchicalBioEncoder.setAnnotatorRelation(pAnnotatorRelation);
 							hierarchicalBioEncoder.setFilterFingerprinted(pFilterFingerprinted);
+							hierarchicalBioEncoder.setUseTTLabConllFeatures(pUseTTLabConllFeatures);
 							hierarchicalBioEncoder.build();
 							if (hierarchicalBioEncoder.getNamedEntitiyCount() > 0) {
 								printConllFile(hierarchicalBioEncoder);
@@ -225,6 +230,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 							TTLabHierarchicalIobEncoder hierarchicalBioEncoder = new TTLabHierarchicalIobEncoder(aJCas, validViewNames);
 							hierarchicalBioEncoder.setAnnotatorRelation(pAnnotatorRelation);
 							hierarchicalBioEncoder.setFilterFingerprinted(pFilterFingerprinted);
+							hierarchicalBioEncoder.setUseTTLabConllFeatures(pUseTTLabConllFeatures);
 							hierarchicalBioEncoder.build();
 							if (hierarchicalBioEncoder.getNamedEntitiyCount() > 0) {
 								printConllFile(hierarchicalBioEncoder);
@@ -279,12 +285,12 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 		try (PrintWriter conllWriter = getPrintWriter(aJCas, filenameSuffix)) {
 			
 			int emptySentences = 0;
+			int entityCount = 0;
 			for (Sentence sentence : select(aJCas, Sentence.class)) {
 				HashMap<Token, Row> ctokens = new LinkedHashMap<>();
 				
 				// Tokens
 				List<Token> coveredTokens = selectCovered(Token.class, sentence);
-				int entityCount = 0;
 				for (Token token : coveredTokens) {
 					Lemma lemma = token.getLemma();
 					POS pos = token.getPos();
@@ -353,6 +359,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 			if (emptySentences > 0) {
 				getLogger().info(String.format("Skipped %d empty sentences.", emptySentences));
 			}
+			getLogger().info(String.format("Wrote file with %d tags.", entityCount));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

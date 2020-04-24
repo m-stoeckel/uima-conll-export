@@ -3,8 +3,10 @@ package org.texttechnologylab.uima.conll.iobencoder;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.uima.UIMAException;
 import org.apache.uima.cas.CASException;
+import org.apache.uima.cas.text.AnnotationFS;
 import org.apache.uima.fit.factory.JCasFactory;
 import org.apache.uima.fit.util.JCasUtil;
 import org.apache.uima.jcas.JCas;
@@ -55,16 +57,30 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 	boolean removeDuplicateSameType = true;
 	
 	/**
-	 * If true, remove overlapping duplicate entries from multiple views of the same type <b>only</b> if they start at
-	 * the same token. Default: true.
+	 * If true, remove overlapping duplicate entries from multiple views of the same type <b>only</b> if they start on
+	 * the same token. Default: false.
+	 * <p>
+	 * Example:<table>
+	 * <tr><td>A1</td><td>A2</td><td>M(true)</td><td>M(false)</td></tr>
+	 * <tr><td>B-X</td><td>O</td><td>B-X,O</td><td>B-X</td></tr>
+	 * <tr><td>I-X</td><td>B-X</td><td>B-X,B-X</td><td>I-X</td></tr>
+	 * <tr><td>B-Y</td><td>O</td><td>B-Y,O</td><td>B-Y</td></tr>
+	 * <tr><td>I-Y</td><td>B-Y</td><td>I-Y</td><td>I-Y</td></tr>
+	 * </table>
 	 */
-	boolean removeDuplicateConstrainBegin = true;
+	boolean removeDuplicateConstraintBegin = false;
 	
 	/**
-	 * If true, remove overlapping duplicate entries from multiple views of the same type <b>only</b> if they end at the
+	 * If true, remove overlapping duplicate entries from multiple views of the same type <b>only</b> if they end on the
 	 * same token. Default: false
+	 * <p>
+	 * Example:<table>
+	 * <tr><td>A1</td><td>A2</td><td>M(true)</td><td>M(false)</td></tr>
+	 * <tr><td>B-X</td><td>B-X</td><td>B-X,B-X</td><td>B-X</td></tr>
+	 * <tr><td>I-X</td><td>O</td><td>B-X,O</td><td>I-X</td></tr>
+	 * </table>
 	 */
-	boolean removeDuplicateConstrainEnd = false;
+	boolean removeDuplicateConstraintEnd = false;
 	
 	/**
 	 * The annotator relation can either be to {@link #BLACKLIST} or to {@link #WHITELIST} the anntotators in the {@link
@@ -122,18 +138,7 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 			
 			// Flatten the new view by removing identical duplicates
 			if (removeDuplicateSameType) {
-				LinkedHashSet<T> iterNamedEntities = (LinkedHashSet<T>) namedEntities.clone();
-				for (T parentNamedEntity : iterNamedEntities) {
-					JCasUtil.subiterate(mergedCas, type, parentNamedEntity, false, true)
-							.forEach(childNamedEntity -> {
-								if (namedEntities.contains(childNamedEntity)
-										&& parentNamedEntity.getType() == childNamedEntity.getType()
-										&& (!removeDuplicateConstrainBegin || parentNamedEntity.getBegin() == childNamedEntity.getBegin())
-										&& (!removeDuplicateConstrainEnd || parentNamedEntity.getEnd() == childNamedEntity.getEnd())
-								)
-									namedEntities.remove(childNamedEntity);
-							});
-				}
+				removeDuplicates(namedEntities);
 			}
 			// Initialize the hierarchy
 			namedEntities.forEach(key -> namedEntityHierachy.put(key, 0L));
@@ -181,11 +186,34 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 		}
 	}
 	
+	/**
+	 * Remove all duplicate, overlapping annotations subclassing {@link #type} using {@link
+	 * JCasUtil#subiterate(JCas, Class, AnnotationFS, boolean, boolean)}. Will only remove shorter or equal length
+	 * child annotations for any given parent annotation.
+	 *
+	 * @param namedEntities The set of entities to remove all duplicates from.
+	 */
+	protected void removeDuplicates(LinkedHashSet<T> namedEntities) {
+		LinkedHashSet<T> iterNamedEntities = (LinkedHashSet<T>) namedEntities.clone();
+		for (T parentNamedEntity : iterNamedEntities) {
+			JCasUtil.subiterate(mergedCas, type, parentNamedEntity, true, true)
+					.forEach(childNamedEntity -> {
+						if (namedEntities.contains(childNamedEntity)
+								&& parentNamedEntity.getType().getShortName().equals(childNamedEntity.getType().getShortName())
+								&& (!removeDuplicateConstraintBegin || parentNamedEntity.getBegin() == childNamedEntity.getBegin())
+								&& (!removeDuplicateConstraintEnd || parentNamedEntity.getEnd() == childNamedEntity.getEnd())
+						)
+							namedEntities.remove(childNamedEntity);
+					});
+		}
+	}
+	
 	void mergeViews() throws CASException {
 		CasCopier.copyCas(jCas.getCas(), mergedCas.getCas(), true, true);
 		
 		jCas.getViewIterator().forEachRemaining(viewCas -> {
-			if (annotatorRelation == annotatorSet.contains(viewCas.getViewName())) {
+			String viewName = StringUtils.substringAfterLast(viewCas.getViewName().trim(), "/");
+			if (annotatorRelation == annotatorSet.contains(viewName)) {
 				// Get all fingerprinted TOPs
 				HashSet<TOP> fingerprinted = select(viewCas, Fingerprint.class).stream()
 						.map(Fingerprint::getReference)
@@ -200,6 +228,15 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 				// FIXME: Features such as value or identifiers are not copied in this generic version!
 			}
 		});
+		
+		// Remove all sub-tokens, ie. the halves of a tokens that were split by a hyphen.
+		ArrayList<Token> subTokens = new ArrayList<>();
+		JCasUtil.select(mergedCas, Token.class).forEach(
+				token -> JCasUtil.subiterate(mergedCas, Token.class, token, true, true).forEach(
+						subTokens::add
+				)
+		);
+		subTokens.forEach(mergedCas::removeFsFromIndexes);
 	}
 	
 	
@@ -516,7 +553,7 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 		return Objects.isNull(namedEntityHierachy) ? 0 : namedEntityHierachy.size();
 	}
 	
-	enum Strategy {
+	public enum Strategy {
 		TopFirstBottomUp(0), TopDown(1), BottomUp(2), MaxCoverage(3);
 		
 		final int index;
@@ -543,12 +580,12 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 		this.removeDuplicateSameType = removeDuplicateSameType;
 	}
 	
-	public void setRemoveDuplicateConstrainBegin(boolean removeDuplicateConstrainBegin) {
-		this.removeDuplicateConstrainBegin = removeDuplicateConstrainBegin;
+	public void setRemoveDuplicateConstraintBegin(boolean removeDuplicateConstraintBegin) {
+		this.removeDuplicateConstraintBegin = removeDuplicateConstraintBegin;
 	}
 	
-	public void setRemoveDuplicateConstrainEnd(boolean removeDuplicateConstrainEnd) {
-		this.removeDuplicateConstrainEnd = removeDuplicateConstrainEnd;
+	public void setRemoveDuplicateConstraintEnd(boolean removeDuplicateConstraintEnd) {
+		this.removeDuplicateConstraintEnd = removeDuplicateConstraintEnd;
 	}
 	
 	public void setAnnotatorRelation(boolean annotatorRelation) {
