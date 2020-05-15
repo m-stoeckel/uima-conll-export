@@ -28,6 +28,7 @@ import org.texttechnologylab.uima.conll.iobencoder.DKProHierarchicalIobEncoder;
 import org.texttechnologylab.uima.conll.iobencoder.GenericIobEncoder;
 import org.texttechnologylab.uima.conll.iobencoder.TTLabHierarchicalIobEncoder;
 
+import javax.annotation.Nonnull;
 import javax.validation.constraints.NotNull;
 import java.io.*;
 import java.nio.file.Files;
@@ -45,7 +46,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 	/**
 	 * Character encoding of the output data.
 	 */
-	private static final String UNUSED = "_";
+	static final String UNUSED = "_";
 	public static final String PARAM_TARGET_LOCATION = ComponentParameters.PARAM_TARGET_LOCATION;
 	@ConfigurationParameter(name = PARAM_TARGET_LOCATION, mandatory = true, defaultValue = ComponentParameters.PARAM_TARGET_LOCATION)
 	private String targetLocation;
@@ -60,34 +61,34 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 	
 	public static final String PARAM_FILENAME_EXTENSION = ComponentParameters.PARAM_FILENAME_EXTENSION;
 	@ConfigurationParameter(name = PARAM_FILENAME_EXTENSION, mandatory = true, defaultValue = ".conll")
-	private String filenameSuffix;
+	String filenameSuffix;
 	
 	public static final String PARAM_WRITE_POS = ComponentParameters.PARAM_WRITE_POS;
 	@ConfigurationParameter(name = PARAM_WRITE_POS, mandatory = true, defaultValue = "true")
-	private boolean writePos;
+	boolean writePos;
 	
 	public static final String PARAM_WRITE_CHUNK = ComponentParameters.PARAM_WRITE_CHUNK;
 	@ConfigurationParameter(name = PARAM_WRITE_CHUNK, mandatory = true, defaultValue = "true")
-	private boolean writeChunk;
+	boolean writeChunk;
 	
 	public static final String PARAM_WRITE_NAMED_ENTITY = ComponentParameters.PARAM_WRITE_NAMED_ENTITY;
 	@ConfigurationParameter(name = PARAM_WRITE_NAMED_ENTITY, mandatory = true, defaultValue = "true")
-	private boolean writeNamedEntity;
+	boolean writeNamedEntity;
 	
 	/**
 	 * The number of desired NE columns
 	 */
 	public static final String PARAM_NAMED_ENTITY_COLUMNS = "pNamedEntityColumns";
 	@ConfigurationParameter(name = PARAM_NAMED_ENTITY_COLUMNS, defaultValue = "1")
-	private Integer pNamedEntityColumns;
+	Integer pNamedEntityColumns;
 	
 	public static final String PARAM_CONLL_SEPARATOR = "pConllSeparator";
 	@ConfigurationParameter(name = PARAM_CONLL_SEPARATOR, defaultValue = " ")
-	private String pConllSeparator;
+	String pConllSeparator;
 	
 	public static final String PARAM_STRATEGY_INDEX = "pEncoderStrategyIndex";
 	@ConfigurationParameter(name = PARAM_STRATEGY_INDEX, defaultValue = "0")
-	private Integer pEncoderStrategyIndex;
+	Integer pEncoderStrategyIndex;
 	
 	public static final String PARAM_FILTER_FINGERPRINTED = "pFilterFingerprinted";
 	@ConfigurationParameter(name = PARAM_FILTER_FINGERPRINTED, defaultValue = "true")
@@ -129,6 +130,14 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 	@ConfigurationParameter(name = PARAM_USE_TTLAB_CONLL_FEATURES, mandatory = false, defaultValue = "false")
 	private Boolean pUseTTLabConllFeatures;
 	
+	public static final String PARAM_MERGE_VIEWS = "pMergeViews";
+	@ConfigurationParameter(name = PARAM_MERGE_VIEWS, mandatory = false, defaultValue = "true")
+	private Boolean pMergeViews;
+	
+	public static final String PARAM_REMOVE_DUPLICATES_SAME_TYPE = "pRemoveDuplicatesSameType";
+	@ConfigurationParameter(name = PARAM_REMOVE_DUPLICATES_SAME_TYPE, mandatory = false, defaultValue = "true")
+	private Boolean pRemoveDuplicatesSameType;
+	
 	public static final String PARAM_ANNOTATOR_LIST = "pAnnotatorList";
 	@ConfigurationParameter(name = PARAM_ANNOTATOR_LIST, mandatory = false, defaultValue = "",
 			description = "Array of view names that should be considered during view merge..")
@@ -164,7 +173,13 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 			defaultValue = "true",
 			description = "If set true, filter sentences that have not at least one annotation. Default: true."
 	)
-	private Boolean pFilterEmptySentences;
+	Boolean pFilterEmptySentences;
+	
+	public static final String PARAM_ONLY_PRINT_PRESENT = "pOnlyPrintPresent";
+	@ConfigurationParameter(name = PARAM_ONLY_PRINT_PRESENT, mandatory = false, defaultValue = "false",
+			description = "Only print columns for present annotations."
+	)
+	private Boolean pOnlyPrintPresent;
 	
 	// End of AnalysisComponent parameters
 	
@@ -181,78 +196,19 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 					AgreementContainer agreementContainer = JCasUtil.selectSingle(iaaView, AgreementContainer.class);
 					StringArray categoryNames = agreementContainer.getCategoryNames();
 					DoubleArray categoryAgreementValues = agreementContainer.getCategoryAgreementValues();
-					
-					ArrayList<Class<? extends Annotation>> filteredCategories = new ArrayList<>();
-					for (int i = 0; i < categoryNames.size(); i++) {
-						String category = categoryNames.get(i);
-						double value = categoryAgreementValues.get(i);
-						if (value >= pFilterByAgreement) {
-							try {
-								filteredCategories.add((Class<? extends Annotation>) Class.forName(category));
-							} catch (ClassCastException | ClassNotFoundException e) {
-								getLogger().error(String.format("Encountered invalid class name '%s' in agreement categories!", category), e);
-							}
-						}
-					}
+					ArrayList<Class<? extends Annotation>> filteredCategories = getFilteredCategories(categoryNames, categoryAgreementValues);
 					
 					// Check if there are categories with high enough agreement
 					if (!filteredCategories.isEmpty()) {
-						if (pUseTTLabTypesystem) {
-							TTLabHierarchicalIobEncoder hierarchicalBioEncoder = new TTLabHierarchicalIobEncoder(aJCas, filteredCategories, validViewNames);
-							hierarchicalBioEncoder.setAnnotatorRelation(pAnnotatorRelation);
-							hierarchicalBioEncoder.setFilterFingerprinted(pFilterFingerprinted);
-							hierarchicalBioEncoder.setUseTTLabConllFeatures(pUseTTLabConllFeatures);
-							hierarchicalBioEncoder.build();
-							if (hierarchicalBioEncoder.getNamedEntitiyCount() > 0) {
-								printConllFile(hierarchicalBioEncoder);
-							} else {
-								printWarning(aJCas, " as it does not contain any named entities.");
-								return;
-							}
-						} else {
-							DKProHierarchicalIobEncoder hierarchicalBioEncoder = new DKProHierarchicalIobEncoder(aJCas, filteredCategories, validViewNames);
-							hierarchicalBioEncoder.setAnnotatorRelation(pAnnotatorRelation);
-							hierarchicalBioEncoder.setFilterFingerprinted(pFilterFingerprinted);
-							hierarchicalBioEncoder.build();
-							if (hierarchicalBioEncoder.getNamedEntitiyCount() > 0) {
-								printConllFile(hierarchicalBioEncoder);
-							} else {
-								printWarning(aJCas, " as it does not contain any named entities.");
-								return;
-							}
-						}
+						printWithIaaFiltering(aJCas, filteredCategories, validViewNames);
 					} else {
 						printWarning(aJCas, String.format(" as no category has at least %.2f agreement.", pFilterByAgreement));
 					}
 				} else { // No IAA filtering
 					if (validViewNames.size() >= pMinViews) { // .. but at least the required number of views
-						if (pUseTTLabTypesystem) {
-							TTLabHierarchicalIobEncoder hierarchicalBioEncoder = new TTLabHierarchicalIobEncoder(aJCas, validViewNames);
-							hierarchicalBioEncoder.setAnnotatorRelation(pAnnotatorRelation);
-							hierarchicalBioEncoder.setFilterFingerprinted(pFilterFingerprinted);
-							hierarchicalBioEncoder.setUseTTLabConllFeatures(pUseTTLabConllFeatures);
-							hierarchicalBioEncoder.build();
-							if (hierarchicalBioEncoder.getNamedEntitiyCount() > 0) {
-								printConllFile(hierarchicalBioEncoder);
-							} else {
-								printWarning(aJCas, " as it does not contain any named entities.");
-								return;
-							}
-						} else {
-							DKProHierarchicalIobEncoder hierarchicalBioEncoder = new DKProHierarchicalIobEncoder(aJCas, validViewNames);
-							hierarchicalBioEncoder.setAnnotatorRelation(pAnnotatorRelation);
-							hierarchicalBioEncoder.setFilterFingerprinted(pFilterFingerprinted);
-							hierarchicalBioEncoder.build();
-							if (hierarchicalBioEncoder.getNamedEntitiyCount() > 0) {
-								printConllFile(hierarchicalBioEncoder);
-							} else {
-								printWarning(aJCas, " as it does not contain any named entities.");
-								return;
-							}
-						}
+						printWithoutIaaFiltering(aJCas, validViewNames);
 					} else {
 						printWarning(aJCas, " as it does not confirm to view constraint.");
-						return;
 					}
 				}
 			} catch (CASException | CASRuntimeException e) {
@@ -261,6 +217,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 				} catch (Exception x) {
 					getLogger().warn(String.format("%s Skipping JCas.", e.getMessage()));
 				}
+				return;
 			}
 		}
 		if (pExportRaw || pExportRawOnly) {
@@ -272,6 +229,79 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 		}
 	}
 	
+	@Nonnull
+	ArrayList<Class<? extends Annotation>> getFilteredCategories(StringArray categoryNames, DoubleArray categoryAgreementValues) {
+		ArrayList<Class<? extends Annotation>> filteredCategories;
+		filteredCategories = new ArrayList<>();
+		for (int i = 0; i < categoryNames.size(); i++) {
+			String category = categoryNames.get(i);
+			double value = categoryAgreementValues.get(i);
+			if (value >= pFilterByAgreement) {
+				try {
+					filteredCategories.add((Class<? extends Annotation>) Class.forName(category));
+				} catch (ClassCastException | ClassNotFoundException e) {
+					getLogger().error(String.format("Encountered invalid class name '%s' in agreement categories!", category), e);
+				}
+			}
+		}
+		return filteredCategories;
+	}
+	
+	boolean printWithoutIaaFiltering(JCas aJCas, ImmutableSet<String> validViewNames) {
+		return printWithIaaFiltering(aJCas, null, validViewNames);
+	}
+	
+	boolean printWithIaaFiltering(JCas aJCas, ArrayList<Class<? extends Annotation>> filteredCategories, ImmutableSet<String> validViewNames) {
+		if (pUseTTLabTypesystem) {
+			TTLabHierarchicalIobEncoder hierarchicalBioEncoder = getTTLabHierarchicalIobEncoder(aJCas, filteredCategories, validViewNames);
+			hierarchicalBioEncoder.setAnnotatorRelation(pAnnotatorRelation);
+			hierarchicalBioEncoder.setFilterFingerprinted(pFilterFingerprinted);
+			hierarchicalBioEncoder.setUseTTLabConllFeatures(pUseTTLabConllFeatures);
+			hierarchicalBioEncoder.setRemoveDuplicateSameType(pRemoveDuplicatesSameType);
+			hierarchicalBioEncoder.setMergeViews(pMergeViews);
+			// FIXME: This does not belog to TTLabHierarchicalIobEncoder, but instead only to TTLabOneColumnPerClassEncoder. Move it there and refactor this hacky selection of Encoders..
+			hierarchicalBioEncoder.setOnlyPrintPresentAnnotations(pOnlyPrintPresent);
+			hierarchicalBioEncoder.build();
+			if (hierarchicalBioEncoder.getNamedEntitiyCount() > 0) {
+				printConllFile(hierarchicalBioEncoder);
+			} else {
+				printWarning(aJCas, " as it does not contain any named entities.");
+				return true;
+			}
+		} else {
+			DKProHierarchicalIobEncoder hierarchicalBioEncoder = getDKProHierarchicalIobEncoder(aJCas, filteredCategories, validViewNames);
+			hierarchicalBioEncoder.setAnnotatorRelation(pAnnotatorRelation);
+			hierarchicalBioEncoder.setFilterFingerprinted(pFilterFingerprinted);
+			hierarchicalBioEncoder.setRemoveDuplicateSameType(pRemoveDuplicatesSameType);
+			hierarchicalBioEncoder.build();
+			if (hierarchicalBioEncoder.getNamedEntitiyCount() > 0) {
+				printConllFile(hierarchicalBioEncoder);
+			} else {
+				printWarning(aJCas, " as it does not contain any named entities.");
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	@Nonnull
+	TTLabHierarchicalIobEncoder getTTLabHierarchicalIobEncoder(JCas aJCas, ArrayList<Class<? extends Annotation>> filteredCategories, ImmutableSet<String> validViewNames) {
+		if (filteredCategories == null) {
+			return new TTLabHierarchicalIobEncoder(aJCas, validViewNames);
+		} else {
+			return new TTLabHierarchicalIobEncoder(aJCas, filteredCategories, validViewNames);
+		}
+	}
+	
+	@Nonnull
+	DKProHierarchicalIobEncoder getDKProHierarchicalIobEncoder(JCas aJCas, ArrayList<Class<? extends Annotation>> filteredCategories, ImmutableSet<String> validViewNames) {
+		if (filteredCategories == null) {
+			return new DKProHierarchicalIobEncoder(aJCas, validViewNames);
+		} else {
+			return new DKProHierarchicalIobEncoder(aJCas, filteredCategories, validViewNames);
+		}
+	}
+	
 	private void printWarning(JCas aJCas, String message) {
 		try {
 			getLogger().warn(String.format("Skipping JCas '%s'", DocumentMetaData.get(aJCas).getDocumentId()) + message);
@@ -280,7 +310,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 		}
 	}
 	
-	private <T extends Annotation> void printConllFile(GenericIobEncoder<T> hierarchicalBioEncoder) {
+	<T extends Annotation> void printConllFile(GenericIobEncoder<T> hierarchicalBioEncoder) {
 		JCas aJCas = hierarchicalBioEncoder.getMergedCas();
 		try (PrintWriter conllWriter = getPrintWriter(aJCas, filenameSuffix)) {
 			
@@ -382,7 +412,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 	}
 	
 	@NotNull
-	private PrintWriter getPrintWriter(JCas aJCas, String aExtension) throws IOException {
+	PrintWriter getPrintWriter(JCas aJCas, String aExtension) throws IOException {
 		String relativePath = getFileName(aJCas);
 		Files.createDirectories(Paths.get(targetLocation));
 		File file = new File(targetLocation, relativePath + aExtension);
@@ -418,7 +448,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 		return FileUtils.openOutputStream(file);
 	}
 	
-	private static final class Row {
+	static final class Row {
 		Token token;
 		String lemma;
 		String pos;

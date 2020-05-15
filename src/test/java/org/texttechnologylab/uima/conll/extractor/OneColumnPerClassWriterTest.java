@@ -1,6 +1,5 @@
 package org.texttechnologylab.uima.conll.extractor;
 
-import com.google.common.collect.Lists;
 import de.tudarmstadt.ukp.dkpro.core.api.metadata.type.DocumentMetaData;
 import de.tudarmstadt.ukp.dkpro.core.api.ner.type.Location;
 import de.tudarmstadt.ukp.dkpro.core.api.ner.type.Organization;
@@ -9,53 +8,28 @@ import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
 import org.apache.uima.UIMAException;
 import org.apache.uima.analysis_engine.AnalysisEngine;
+import org.apache.uima.cas.impl.XmiCasSerializer;
+import org.apache.uima.collection.CollectionException;
 import org.apache.uima.collection.CollectionReader;
 import org.apache.uima.fit.factory.AnalysisEngineFactory;
 import org.apache.uima.fit.factory.CollectionReaderFactory;
 import org.apache.uima.fit.factory.JCasFactory;
 import org.apache.uima.fit.pipeline.SimplePipeline;
-import org.apache.uima.fit.util.JCasUtil;
 import org.apache.uima.jcas.JCas;
+import org.apache.uima.resource.ResourceInitializationException;
+import org.dkpro.core.io.conll.Conll2003Reader;
 import org.dkpro.core.io.xmi.XmiReader;
 import org.junit.Test;
 import org.texttechnologylab.agreement.engine.TTLabUnitizingIAACollectionProcessingEngine;
-import org.texttechnologylab.uima.conll.iobencoder.DKProHierarchicalIobEncoder;
-import org.texttechnologylab.uima.conll.iobencoder.GenericIobEncoder;
 
 import java.io.IOException;
-import java.util.ArrayList;
+import java.nio.file.Files;
 
 import static org.texttechnologylab.agreement.engine.TTLabUnitizingIAACollectionProcessingEngine.*;
-import static org.texttechnologylab.uima.conll.iobencoder.GenericIobEncoder.Strategy.MaxCoverage;
 
-public class ConllBIO2003WriterTest {
+public class OneColumnPerClassWriterTest {
 	
-	@Test
-	public void testEncoder() {
-		try {
-			JCas jCas = getjCas();
-			
-			DKProHierarchicalIobEncoder encoder = new DKProHierarchicalIobEncoder(jCas);
-			encoder.setRemoveDuplicateSameType(false);
-			encoder.setFilterFingerprinted(false);
-			encoder.build();
-			
-			ArrayList<Token> tokens = Lists.newArrayList(JCasUtil.select(encoder.getMergedCas(), Token.class));
-			for (int strategy = 0; strategy < 4; strategy++) {
-				for (Token token : tokens) {
-					System.out.printf("%s %s\n",
-							token.getCoveredText(),
-							encoder.getFeaturesForNColumns(token, strategy, 4)
-					);
-				}
-				System.out.println();
-			}
-		} catch (UIMAException e) {
-			e.printStackTrace();
-		}
-	}
-	
-	@Test
+	//	@Test
 	public void conllWriter() {
 		try {
 			JCas jCas = getjCas();
@@ -66,13 +40,13 @@ public class ConllBIO2003WriterTest {
 			documentMetaData.setDocumentUri("basicGUF");
 			
 			final AnalysisEngine conllEngine = AnalysisEngineFactory.createEngine(
-					ConllBIO2003Writer.class,
-					ConllBIO2003Writer.PARAM_TARGET_LOCATION, "src/test/out/",
-					ConllBIO2003Writer.PARAM_OVERWRITE, true,
-					ConllBIO2003Writer.PARAM_FILTER_FINGERPRINTED, false,
-					ConllBIO2003Writer.PARAM_MIN_VIEWS, 0,
-					ConllBIO2003Writer.PARAM_USE_TTLAB_TYPESYSTEM, false,
-					ConllBIO2003Writer.PARAM_ANNOTATOR_RELATION, false
+					OneClassPerColumnWriter.class,
+					OneClassPerColumnWriter.PARAM_TARGET_LOCATION, "src/test/out/",
+					OneClassPerColumnWriter.PARAM_OVERWRITE, true,
+					OneClassPerColumnWriter.PARAM_FILTER_FINGERPRINTED, false,
+					OneClassPerColumnWriter.PARAM_MIN_VIEWS, 0,
+					OneClassPerColumnWriter.PARAM_USE_TTLAB_TYPESYSTEM, false,
+					OneClassPerColumnWriter.PARAM_ANNOTATOR_RELATION, false
 			);
 			
 			conllEngine.process(jCas);
@@ -81,7 +55,7 @@ public class ConllBIO2003WriterTest {
 		}
 	}
 	
-	@Test
+	//	@Test
 	public void singleColumn() {
 		try {
 			JCas jCas = getjCas();
@@ -92,13 +66,13 @@ public class ConllBIO2003WriterTest {
 			documentMetaData.setDocumentUri("singleColumnGUF");
 			
 			final AnalysisEngine conllEngine = AnalysisEngineFactory.createEngine(
-					ConllBIO2003Writer.class,
-					ConllBIO2003Writer.PARAM_TARGET_LOCATION, "src/test/out/",
-					ConllBIO2003Writer.PARAM_OVERWRITE, true,
-					ConllBIO2003Writer.PARAM_FILTER_FINGERPRINTED, false,
-					ConllBIO2003Writer.PARAM_MIN_VIEWS, 0,
-					ConllBIO2003Writer.PARAM_USE_TTLAB_TYPESYSTEM, false,
-					ConllBIO2003Writer.PARAM_ANNOTATOR_RELATION, false
+					OneClassPerColumnWriter.class,
+					OneClassPerColumnWriter.PARAM_TARGET_LOCATION, "src/test/out/",
+					OneClassPerColumnWriter.PARAM_OVERWRITE, true,
+					OneClassPerColumnWriter.PARAM_FILTER_FINGERPRINTED, false,
+					OneClassPerColumnWriter.PARAM_MIN_VIEWS, 0,
+					OneClassPerColumnWriter.PARAM_USE_TTLAB_TYPESYSTEM, false,
+					OneClassPerColumnWriter.PARAM_ANNOTATOR_RELATION, false
 			);
 			
 			conllEngine.process(jCas);
@@ -107,7 +81,7 @@ public class ConllBIO2003WriterTest {
 		}
 	}
 	
-	@Test
+	//	@Test
 	public void doubleColumn() {
 		try {
 			JCas jCas = getjCas();
@@ -118,14 +92,14 @@ public class ConllBIO2003WriterTest {
 			documentMetaData.setDocumentUri("doubleColumnGUF");
 			
 			final AnalysisEngine conllEngine = AnalysisEngineFactory.createEngine(
-					ConllBIO2003Writer.class,
-					ConllBIO2003Writer.PARAM_TARGET_LOCATION, "src/test/out/",
-					ConllBIO2003Writer.PARAM_OVERWRITE, true,
-					ConllBIO2003Writer.PARAM_NAMED_ENTITY_COLUMNS, 2,
-					ConllBIO2003Writer.PARAM_FILTER_FINGERPRINTED, false,
-					ConllBIO2003Writer.PARAM_MIN_VIEWS, 0,
-					ConllBIO2003Writer.PARAM_USE_TTLAB_TYPESYSTEM, false,
-					ConllBIO2003Writer.PARAM_ANNOTATOR_RELATION, false
+					OneClassPerColumnWriter.class,
+					OneClassPerColumnWriter.PARAM_TARGET_LOCATION, "src/test/out/",
+					OneClassPerColumnWriter.PARAM_OVERWRITE, true,
+					OneClassPerColumnWriter.PARAM_NAMED_ENTITY_COLUMNS, 2,
+					OneClassPerColumnWriter.PARAM_FILTER_FINGERPRINTED, false,
+					OneClassPerColumnWriter.PARAM_MIN_VIEWS, 0,
+					OneClassPerColumnWriter.PARAM_USE_TTLAB_TYPESYSTEM, false,
+					OneClassPerColumnWriter.PARAM_ANNOTATOR_RELATION, false
 			);
 			
 			conllEngine.process(jCas);
@@ -134,7 +108,7 @@ public class ConllBIO2003WriterTest {
 		}
 	}
 	
-	@Test
+	//	@Test
 	public void tripleColumn() {
 		try {
 			JCas jCas = getjCas();
@@ -145,14 +119,14 @@ public class ConllBIO2003WriterTest {
 			documentMetaData.setDocumentUri("tripleColumnGUF");
 			
 			final AnalysisEngine conllEngine = AnalysisEngineFactory.createEngine(
-					ConllBIO2003Writer.class,
-					ConllBIO2003Writer.PARAM_TARGET_LOCATION, "src/test/out/",
-					ConllBIO2003Writer.PARAM_OVERWRITE, true,
-					ConllBIO2003Writer.PARAM_NAMED_ENTITY_COLUMNS, 3,
-					ConllBIO2003Writer.PARAM_FILTER_FINGERPRINTED, false,
-					ConllBIO2003Writer.PARAM_MIN_VIEWS, 0,
-					ConllBIO2003Writer.PARAM_USE_TTLAB_TYPESYSTEM, false,
-					ConllBIO2003Writer.PARAM_ANNOTATOR_RELATION, false
+					OneClassPerColumnWriter.class,
+					OneClassPerColumnWriter.PARAM_TARGET_LOCATION, "src/test/out/",
+					OneClassPerColumnWriter.PARAM_OVERWRITE, true,
+					OneClassPerColumnWriter.PARAM_NAMED_ENTITY_COLUMNS, 3,
+					OneClassPerColumnWriter.PARAM_FILTER_FINGERPRINTED, false,
+					OneClassPerColumnWriter.PARAM_MIN_VIEWS, 0,
+					OneClassPerColumnWriter.PARAM_USE_TTLAB_TYPESYSTEM, false,
+					OneClassPerColumnWriter.PARAM_ANNOTATOR_RELATION, false
 			);
 			
 			conllEngine.process(jCas);
@@ -165,7 +139,7 @@ public class ConllBIO2003WriterTest {
 	public void exampleFile() {
 		try {
 			String[] annotatorWhitelist = {"305236", "305235"};
-			String[] annotatorBlacklist = {"0", "303228"};
+			String[] annotatorBlacklist = {"0", "302904", "303228", "306320", "305718", "306513"};
 			final AnalysisEngine agreementEngine = AnalysisEngineFactory.createEngine(
 					TTLabUnitizingIAACollectionProcessingEngine.class,
 //					PARAM_ANNOTATOR_RELATION, WHITELIST,
@@ -180,20 +154,19 @@ public class ConllBIO2003WriterTest {
 			);
 			
 			final AnalysisEngine conllEngine = AnalysisEngineFactory.createEngine(
-					ConllBIO2003Writer.class,
-					ConllBIO2003Writer.PARAM_TARGET_LOCATION, "src/test/out/",
-					ConllBIO2003Writer.PARAM_OVERWRITE, true,
-					ConllBIO2003Writer.PARAM_USE_TTLAB_TYPESYSTEM, true,
-					ConllBIO2003Writer.PARAM_STRATEGY_INDEX, MaxCoverage.ordinal(),
-					ConllBIO2003Writer.PARAM_NAMED_ENTITY_COLUMNS, 5,
-					ConllBIO2003Writer.PARAM_FILTER_FINGERPRINTED, true,
-//					ConllBIO2003Writer.PARAM_ANNOTATOR_RELATION, ConllBIO2003Writer.WHITELIST,
-//					ConllBIO2003Writer.PARAM_ANNOTATOR_LIST, annotatorWhitelist,
-					ConllBIO2003Writer.PARAM_ANNOTATOR_RELATION, ConllBIO2003Writer.BLACKLIST,
-					ConllBIO2003Writer.PARAM_ANNOTATOR_LIST, annotatorBlacklist,
-					ConllBIO2003Writer.PARAM_MIN_VIEWS, 1,
-					ConllBIO2003Writer.PARAM_FILTER_BY_AGREEMENT, 0.6F,
-					ConllBIO2003Writer.PARAM_FILTER_EMPTY_SENTENCES, true);
+					OneClassPerColumnWriter.class,
+					OneClassPerColumnWriter.PARAM_TARGET_LOCATION, "src/test/out/",
+					OneClassPerColumnWriter.PARAM_OVERWRITE, true,
+					OneClassPerColumnWriter.PARAM_USE_TTLAB_TYPESYSTEM, true,
+					OneClassPerColumnWriter.PARAM_USE_TTLAB_CONLL_FEATURES, false,
+					OneClassPerColumnWriter.PARAM_FILTER_FINGERPRINTED, false,
+//					OneClassPerColumnWriter.PARAM_ANNOTATOR_RELATION, OneClassPerColumnWriter.WHITELIST,
+//					OneClassPerColumnWriter.PARAM_ANNOTATOR_LIST, annotatorWhitelist,
+					OneClassPerColumnWriter.PARAM_ANNOTATOR_RELATION, OneClassPerColumnWriter.BLACKLIST,
+					OneClassPerColumnWriter.PARAM_ANNOTATOR_LIST, annotatorBlacklist,
+					OneClassPerColumnWriter.PARAM_MIN_VIEWS, 1,
+//					OneClassPerColumnWriter.PARAM_FILTER_BY_AGREEMENT, 0.6F,
+					OneClassPerColumnWriter.PARAM_FILTER_EMPTY_SENTENCES, true);
 			
 			CollectionReader reader = CollectionReaderFactory.createReader(XmiReader.class,
 					XmiReader.PARAM_PATTERNS, "[+]**.xmi",
@@ -204,6 +177,38 @@ public class ConllBIO2003WriterTest {
 		} catch (UIMAException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	@Test
+	public void testConll() {
+		
+		try {
+			CollectionReader reader = CollectionReaderFactory.createReader(Conll2003Reader.class,
+					Conll2003Reader.PARAM_SOURCE_LOCATION, "/home/manu/.flair/datasets/wikiner_german/",
+					Conll2003Reader.PARAM_PATTERNS, "[+]aij-wikiner-de-wp3.conll2000",
+					Conll2003Reader.PARAM_NAMED_ENTITY_MAPPING_LOCATION, "/home/manu/Work/biofid-gazetteer/src/main/resources/org/biofid/gazetteer/lib/ner-default.map"
+			);
+			JCas jCas = JCasFactory.createJCas();
+			reader.getNext(jCas.getCas());
+			
+			final AnalysisEngine conllEngine = AnalysisEngineFactory.createEngine(
+					OneClassPerColumnWriter.class,
+					OneClassPerColumnWriter.PARAM_TARGET_LOCATION, "src/test/out/",
+					OneClassPerColumnWriter.PARAM_OVERWRITE, true,
+					OneClassPerColumnWriter.PARAM_USE_TTLAB_TYPESYSTEM, true,
+					OneClassPerColumnWriter.PARAM_USE_TTLAB_CONLL_FEATURES, false,
+					OneClassPerColumnWriter.PARAM_FILTER_FINGERPRINTED, false,
+					OneClassPerColumnWriter.PARAM_REMOVE_DUPLICATES_SAME_TYPE, false,
+					OneClassPerColumnWriter.PARAM_MERGE_VIEWS, false,
+					OneClassPerColumnWriter.PARAM_MIN_VIEWS, 0,
+					OneClassPerColumnWriter.PARAM_FILTER_EMPTY_SENTENCES, true,
+					OneClassPerColumnWriter.PARAM_ONLY_PRINT_PRESENT, true
+			);
+			
+			SimplePipeline.runPipeline(jCas, conllEngine);
+		} catch (IOException | UIMAException e) {
 			e.printStackTrace();
 		}
 	}

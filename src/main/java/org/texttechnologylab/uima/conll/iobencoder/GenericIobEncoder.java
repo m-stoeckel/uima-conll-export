@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.log4j.Logger;
 import org.apache.uima.UIMAException;
 import org.apache.uima.cas.CASException;
 import org.apache.uima.cas.text.AnnotationFS;
@@ -16,8 +17,8 @@ import org.apache.uima.util.CasCopier;
 import org.jetbrains.annotations.NotNull;
 import org.texttechnologylab.annotation.type.Fingerprint;
 import org.texttechnologylab.annotation.type.TexttechnologyNamedEntity;
-import org.texttechnologylab.uima.conll.extractor.SingleConllFeatures;
 import org.texttechnologylab.uima.conll.extractor.IConllFeatures;
+import org.texttechnologylab.uima.conll.extractor.SingleConllFeatures;
 import org.texttechnologylab.utilities.collections.CountMap;
 
 import java.util.*;
@@ -31,8 +32,10 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 	final HashMap<Token, ArrayList<IConllFeatures>> hierachialTokenNamedEntityMap;
 	final CountMap<T> namedEntityHierachy;
 	final JCas jCas;
-	final ArrayList<Class<? extends Annotation>> forceAnnotations;
+	final ArrayList<Class<? extends Annotation>> includeAnnotations;
 	final TreeMap<Integer, Token> tokenIndexMap;
+	
+	Logger logger = Logger.getLogger(this.getClass());
 	
 	protected JCas mergedCas;
 	
@@ -87,15 +90,16 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 	 * #annotatorSet}. Default: {@link #BLACKLIST}
 	 */
 	boolean annotatorRelation = BLACKLIST;
+	
 	public static boolean WHITELIST = true;
 	public static boolean BLACKLIST = false;
-	
 	TreeMap<Long, TreeSet<T>> namedEntityByRank;
-	ArrayList<Integer> maxCoverageOrder;
 	
+	ArrayList<Integer> maxCoverageOrder;
 	public LinkedHashMap<Integer, Long> coverageCount = new LinkedHashMap<>();
 	
 	Comparator<Annotation> beginComparator = Comparator.comparingInt(Annotation::getBegin);
+	
 	private Comparator<Annotation> hierachialComparator = new Comparator<Annotation>() {
 		@Override
 		public int compare(Annotation o1, Annotation o2) {
@@ -106,14 +110,13 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 	};
 	final ImmutableSet<String> annotatorSet;
 	
-	
 	protected GenericIobEncoder(JCas jCas, ImmutableSet<String> annotatorSet) {
 		this(jCas, new ArrayList<>(), annotatorSet);
 	}
 	
-	GenericIobEncoder(JCas jCas, ArrayList<Class<? extends Annotation>> forceAnnotations, ImmutableSet<String> annotatorSet) {
+	GenericIobEncoder(JCas jCas, ArrayList<Class<? extends Annotation>> includeAnnotations, ImmutableSet<String> annotatorSet) {
 		this.jCas = jCas;
-		this.forceAnnotations = forceAnnotations;
+		this.includeAnnotations = includeAnnotations;
 		this.annotatorSet = annotatorSet;
 		
 		this.hierachialTokenNamedEntityMap = new HashMap<>();
@@ -187,9 +190,9 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 	}
 	
 	/**
-	 * Remove all duplicate, overlapping annotations subclassing {@link #type} using {@link
-	 * JCasUtil#subiterate(JCas, Class, AnnotationFS, boolean, boolean)}. Will only remove shorter or equal length
-	 * child annotations for any given parent annotation.
+	 * Remove all duplicate, overlapping annotations subclassing {@link #type} using {@link JCasUtil#subiterate(JCas,
+	 * Class, AnnotationFS, boolean, boolean)}. Will only remove shorter or equal length child annotations for any given
+	 * parent annotation.
 	 *
 	 * @param namedEntities The set of entities to remove all duplicates from.
 	 */
@@ -239,6 +242,14 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 		subTokens.forEach(mergedCas::removeFsFromIndexes);
 	}
 	
+	
+	protected boolean entityClassIsIncluded(Object oClass) {
+		for (Class<? extends Annotation> forceAnnotation : this.includeAnnotations) {
+			if (forceAnnotation.isAssignableFrom(oClass.getClass()))
+				return true;
+		}
+		return false;
+	}
 	
 	/**
 	 * Create a NE hierarchy by breadth-first search.
@@ -570,8 +581,8 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 			}
 			throw new IndexOutOfBoundsException(String.format("The strategy index %d is out of bounds!", i));
 		}
+		
 	}
-	
 	public void setFilterFingerprinted(boolean filterFingerprinted) {
 		this.filterFingerprinted = filterFingerprinted;
 	}
@@ -590,5 +601,9 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 	
 	public void setAnnotatorRelation(boolean annotatorRelation) {
 		this.annotatorRelation = annotatorRelation;
+	}
+	
+	public Logger getLogger() {
+		return logger;
 	}
 }

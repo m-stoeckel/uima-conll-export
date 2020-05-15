@@ -1,0 +1,124 @@
+package org.texttechnologylab.uima.conll.iobencoder;
+
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
+import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
+import org.apache.uima.UIMAException;
+import org.apache.uima.cas.Type;
+import org.apache.uima.fit.factory.JCasFactory;
+import org.apache.uima.jcas.JCas;
+import org.apache.uima.jcas.tcas.Annotation;
+import org.jetbrains.annotations.NotNull;
+import org.texttechnologylab.annotation.AbstractNamedEntity;
+import org.texttechnologylab.annotation.NamedEntity;
+import org.texttechnologylab.uima.conll.extractor.IConllFeatures;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static org.apache.uima.fit.util.JCasUtil.indexCovered;
+import static org.apache.uima.fit.util.JCasUtil.select;
+
+public class TTLabOneColumnPerClassEncoder extends TTLabHierarchicalIobEncoder {
+	
+	private ArrayList<String> namedEntityTypes = Lists.newArrayList("Act_Action_Activity", "Animal_Fauna",
+			"Archaea", "Artifact", "Attribute_Property", "Bacteria", "Body_Corpus", "Chromista", "Cognition_Ideation",
+			"Communication", "Event_Happening", "Feeling_Emotion", "Food", "Fungi", "Group_Collection", "Habitat",
+			"Lichen", "Location_Place", "Morphology", "Motive", "NaturalObject", "NaturalPhenomenon",
+			"Person_HumanBeing", "Plant_Flora", "Possession_Property", "Process", "Protozoa", "Quantity_Amount",
+			"Relation", "Reproduction", "Shape", "Society", "State_Condition", "Substance", "Taxon", "Time", "Viruses");
+	private ArrayList<String> presentNamedEntityTypes = namedEntityTypes;
+	private LinkedHashSet<Annotation> namedEntities;
+	
+	public TTLabOneColumnPerClassEncoder(JCas jCas) {
+		super(jCas);
+	}
+	
+	public TTLabOneColumnPerClassEncoder(JCas jCas, ImmutableSet<String> annotatorSet) {
+		super(jCas, annotatorSet);
+	}
+	
+	public TTLabOneColumnPerClassEncoder(JCas jCas, ArrayList<Class<? extends Annotation>> includeAnnotations, ImmutableSet<String> annotatorSet) {
+		super(jCas, includeAnnotations, annotatorSet);
+	}
+	
+	@Override
+	public void build() {
+		try {
+			if (jCas.getDocumentText() == null)
+				return;
+			
+			mergeViews();
+			
+			namedEntities = new LinkedHashSet<>();
+			namedEntities.addAll(select(mergedCas, NamedEntity.class));
+			namedEntities.addAll(select(mergedCas, AbstractNamedEntity.class));
+			
+			// Initialize the hierarchy
+			if (onlyPrintPresent) {
+				presentNamedEntityTypes = namedEntities.stream()
+						.map(Annotation::getType)
+						.map(Type::getShortName)
+						.distinct()
+						.filter(namedEntityTypes::contains)
+						.sorted()
+						.collect(Collectors.toCollection(ArrayList::new));
+			}
+			
+			// Flatten the new view by removing identical duplicates
+			if (removeDuplicateSameType) {
+				getLogger().info("Removing duplicates");
+				removeDuplicates(namedEntities);
+			}
+			
+			getLogger().info("Initializing hierarchy");
+			// Create an empty list for all layers of NEs for each Token
+			ArrayList<Token> tokens = new ArrayList<>(select(mergedCas, Token.class));
+			for (int i = 0; i < tokens.size(); i++) {
+				Token token = tokens.get(i);
+				tokenIndexMap.put(i, token);
+				hierachialTokenNamedEntityMap.put(token, getEmptyConllFeatureList());
+			}
+			
+			getLogger().info("Building indices");
+			Map<Annotation, Collection<Token>> tokenNeIndex = indexCovered(mergedCas, Annotation.class, Token.class);
+			
+			getLogger().info("Populating hierarchy");
+			for (Annotation namedEntity : namedEntities) {
+				final int index = presentNamedEntityTypes.indexOf(namedEntity.getType().getShortName());
+				for (Token coveredToken : tokenNeIndex.get(namedEntity)) {
+					hierachialTokenNamedEntityMap.get(coveredToken).set(index, getConllFeatures(namedEntity, coveredToken));
+				}
+			}
+		} catch (UIMAException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	@NotNull
+	ArrayList<IConllFeatures> getEmptyConllFeatureList() {
+		ArrayList<IConllFeatures> iConllFeatures = new ArrayList<>(presentNamedEntityTypes.size());
+		for (int i = 0; i < presentNamedEntityTypes.size(); i++) {
+			iConllFeatures.add(getEmptyConllFeatures());
+		}
+		return iConllFeatures;
+	}
+	
+	public ArrayList<String> getFeaturesForNColumns(Token token, Strategy strategy, int nColumns) {
+		ArrayList<String> retList = new ArrayList<>();
+		for (int i = 0; i < presentNamedEntityTypes.size(); i++) {
+			ArrayList<IConllFeatures> iConllFeatures = this.hierachialTokenNamedEntityMap.get(token);
+			IConllFeatures conllFeatures = iConllFeatures.get(i);
+			retList.addAll(conllFeatures.build());
+		}
+		return retList;
+	}
+	
+	public int getNamedEntitiyCount() {
+		return Objects.isNull(namedEntities) ? 0 : namedEntities.size();
+	}
+	
+	public ArrayList<String> getNamedEntityTypes() {
+		return presentNamedEntityTypes;
+	}
+}

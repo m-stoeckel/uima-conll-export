@@ -20,11 +20,10 @@ import org.texttechnologylab.annotation.type.Fingerprint;
 import org.texttechnologylab.annotation.type.Other;
 import org.texttechnologylab.annotation.type.Taxon;
 import org.texttechnologylab.annotation.type.TexttechnologyNamedEntity;
-import org.texttechnologylab.uima.conll.extractor.TTLabConllFeatures;
 import org.texttechnologylab.uima.conll.extractor.IConllFeatures;
+import org.texttechnologylab.uima.conll.extractor.TTLabConllFeatures;
 
 import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import static org.apache.uima.fit.util.JCasUtil.indexCovered;
@@ -33,6 +32,8 @@ import static org.apache.uima.fit.util.JCasUtil.select;
 public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 	
 	private boolean useTTLabConllFeatures = false;
+	private boolean mergeViews;
+	boolean onlyPrintPresent = false;
 	
 	/**
 	 * DKProHierarchicalBioEncoder that filters for fingerprinted annotations and includes all {@link Taxon} annotations
@@ -139,6 +140,12 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 	
 	@Override
 	void mergeViews() throws CASException {
+		if (!mergeViews) {
+			mergedCas = jCas;
+			return;
+		}
+		getLogger().info("Merging views");
+		
 		CasCopier.copyCas(jCas.getCas(), mergedCas.getCas(), true, true);
 		mergedCas.removeAllIncludingSubtypes(NamedEntity.type);
 		mergedCas.removeAllIncludingSubtypes(AbstractNamedEntity.type);
@@ -158,7 +165,7 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 						.collect(Collectors.toCollection(HashSet::new));
 				
 				for (NamedEntity oNamedEntity : select(viewCas, NamedEntity.class)) {
-					if (!fingerprinted.contains(oNamedEntity)) continue;
+					if (!entityClassIsIncluded(oNamedEntity) || !fingerprinted.contains(oNamedEntity)) continue;
 					
 					NamedEntity nNamedEntity = (NamedEntity) mergedCas.getCas().createAnnotation(oNamedEntity.getType(), oNamedEntity.getBegin(), oNamedEntity.getEnd());
 					nNamedEntity.setValue(oNamedEntity.getValue());
@@ -169,7 +176,8 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 				}
 				
 				for (AbstractNamedEntity oNamedEntity : select(viewCas, AbstractNamedEntity.class)) {
-					if (!fingerprinted.contains(oNamedEntity)) continue;
+					if (!entityClassIsIncluded(oNamedEntity) || !fingerprinted.contains(oNamedEntity))
+						continue;
 					
 					AbstractNamedEntity nNamedEntity = (AbstractNamedEntity) mergedCas.getCas().createAnnotation(oNamedEntity.getType(), oNamedEntity.getBegin(), oNamedEntity.getEnd());
 					nNamedEntity.setValue(oNamedEntity.getValue());
@@ -340,5 +348,13 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 	
 	public void setUseTTLabConllFeatures(boolean useTTLabConllFeatures) {
 		this.useTTLabConllFeatures = useTTLabConllFeatures;
+	}
+	
+	public void setMergeViews(boolean mergeViews){
+		this.mergeViews = mergeViews;
+	}
+	
+	public void setOnlyPrintPresentAnnotations(boolean pOnlyPrintPresent) {
+		this.onlyPrintPresent = pOnlyPrintPresent;
 	}
 }
