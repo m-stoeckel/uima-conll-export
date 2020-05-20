@@ -110,11 +110,11 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 	};
 	final ImmutableSet<String> annotatorSet;
 	
-	protected GenericIobEncoder(JCas jCas, ImmutableSet<String> annotatorSet) {
+	protected GenericIobEncoder(JCas jCas, ImmutableSet<String> annotatorSet) throws UIMAException {
 		this(jCas, new ArrayList<>(), annotatorSet);
 	}
 	
-	GenericIobEncoder(JCas jCas, ArrayList<Class<? extends Annotation>> includeAnnotations, ImmutableSet<String> annotatorSet) {
+	GenericIobEncoder(JCas jCas, ArrayList<Class<? extends Annotation>> includeAnnotations, ImmutableSet<String> annotatorSet) throws UIMAException {
 		this.jCas = jCas;
 		this.includeAnnotations = includeAnnotations;
 		this.annotatorSet = annotatorSet;
@@ -123,6 +123,7 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 		this.namedEntityHierachy = new CountMap<>();
 		this.namedEntityByRank = new TreeMap<>();
 		this.tokenIndexMap = new TreeMap<>();
+		this.mergedCas = JCasFactory.createJCas();
 	}
 	
 	
@@ -134,7 +135,6 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 			if (jCas.getDocumentText() == null)
 				return;
 			
-			mergedCas = JCasFactory.createJCas();
 			mergeViews();
 			
 			final LinkedHashSet<T> namedEntities = new LinkedHashSet<>(select(mergedCas, this.type));
@@ -212,6 +212,7 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 	}
 	
 	void mergeViews() throws CASException {
+		mergedCas.reset();
 		CasCopier.copyCas(jCas.getCas(), mergedCas.getCas(), true, true);
 		
 		jCas.getViewIterator().forEachRemaining(viewCas -> {

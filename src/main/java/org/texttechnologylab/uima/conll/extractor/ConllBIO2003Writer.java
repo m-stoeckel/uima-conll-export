@@ -12,6 +12,7 @@ import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.output.CloseShieldOutputStream;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.uima.UIMAException;
 import org.apache.uima.analysis_engine.AnalysisEngineProcessException;
 import org.apache.uima.cas.CASException;
 import org.apache.uima.cas.CASRuntimeException;
@@ -218,6 +219,8 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 					getLogger().warn(String.format("%s Skipping JCas.", e.getMessage()));
 				}
 				return;
+			} catch (UIMAException e) {
+				throw new AnalysisEngineProcessException(e);
 			}
 		}
 		if (pExportRaw || pExportRawOnly) {
@@ -247,11 +250,11 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 		return filteredCategories;
 	}
 	
-	boolean printWithoutIaaFiltering(JCas aJCas, ImmutableSet<String> validViewNames) {
+	boolean printWithoutIaaFiltering(JCas aJCas, ImmutableSet<String> validViewNames) throws UIMAException {
 		return printWithIaaFiltering(aJCas, null, validViewNames);
 	}
 	
-	boolean printWithIaaFiltering(JCas aJCas, ArrayList<Class<? extends Annotation>> filteredCategories, ImmutableSet<String> validViewNames) {
+	boolean printWithIaaFiltering(JCas aJCas, ArrayList<Class<? extends Annotation>> filteredCategories, ImmutableSet<String> validViewNames) throws UIMAException {
 		if (pUseTTLabTypesystem) {
 			TTLabHierarchicalIobEncoder hierarchicalBioEncoder = getTTLabHierarchicalIobEncoder(aJCas, filteredCategories, validViewNames);
 			hierarchicalBioEncoder.setAnnotatorRelation(pAnnotatorRelation);
@@ -285,7 +288,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 	}
 	
 	@Nonnull
-	TTLabHierarchicalIobEncoder getTTLabHierarchicalIobEncoder(JCas aJCas, ArrayList<Class<? extends Annotation>> filteredCategories, ImmutableSet<String> validViewNames) {
+	TTLabHierarchicalIobEncoder getTTLabHierarchicalIobEncoder(JCas aJCas, ArrayList<Class<? extends Annotation>> filteredCategories, ImmutableSet<String> validViewNames) throws UIMAException {
 		if (filteredCategories == null) {
 			return new TTLabHierarchicalIobEncoder(aJCas, validViewNames);
 		} else {
@@ -294,7 +297,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 	}
 	
 	@Nonnull
-	DKProHierarchicalIobEncoder getDKProHierarchicalIobEncoder(JCas aJCas, ArrayList<Class<? extends Annotation>> filteredCategories, ImmutableSet<String> validViewNames) {
+	DKProHierarchicalIobEncoder getDKProHierarchicalIobEncoder(JCas aJCas, ArrayList<Class<? extends Annotation>> filteredCategories, ImmutableSet<String> validViewNames) throws UIMAException {
 		if (filteredCategories == null) {
 			return new DKProHierarchicalIobEncoder(aJCas, validViewNames);
 		} else {

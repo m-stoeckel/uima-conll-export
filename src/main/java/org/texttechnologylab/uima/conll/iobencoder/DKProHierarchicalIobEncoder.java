@@ -5,6 +5,7 @@ import com.google.common.collect.Lists;
 import de.tudarmstadt.ukp.dkpro.core.api.metadata.type.DocumentMetaData;
 import de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity;
 import org.apache.commons.collections4.bidimap.DualLinkedHashBidiMap;
+import org.apache.uima.UIMAException;
 import org.apache.uima.cas.CASException;
 import org.apache.uima.jcas.JCas;
 import org.apache.uima.jcas.cas.TOP;
@@ -25,7 +26,7 @@ public class DKProHierarchicalIobEncoder extends GenericIobEncoder<NamedEntity> 
 	 *
 	 * @param jCas The JCas to process.
 	 */
-	public DKProHierarchicalIobEncoder(JCas jCas) {
+	public DKProHierarchicalIobEncoder(JCas jCas) throws UIMAException {
 		this(jCas, Lists.newArrayList(NamedEntity.class), ImmutableSet.of());
 	}
 	
@@ -35,7 +36,7 @@ public class DKProHierarchicalIobEncoder extends GenericIobEncoder<NamedEntity> 
 	 *
 	 * @param jCas The JCas to process.
 	 */
-	public DKProHierarchicalIobEncoder(JCas jCas, ImmutableSet<String> annotatorList) {
+	public DKProHierarchicalIobEncoder(JCas jCas, ImmutableSet<String> annotatorList) throws UIMAException {
 		this(jCas, Lists.newArrayList(NamedEntity.class), annotatorList);
 	}
 	
@@ -45,13 +46,14 @@ public class DKProHierarchicalIobEncoder extends GenericIobEncoder<NamedEntity> 
 	 * @param jCas             The JCas to process.
 	 * @param forceAnnotations Include all annotations of these classes.
 	 */
-	public DKProHierarchicalIobEncoder(JCas jCas, ArrayList<Class<? extends Annotation>> forceAnnotations, ImmutableSet<String> annotatorList) {
+	public DKProHierarchicalIobEncoder(JCas jCas, ArrayList<Class<? extends Annotation>> forceAnnotations, ImmutableSet<String> annotatorList) throws UIMAException {
 		super(jCas, forceAnnotations, annotatorList);
 		this.type = NamedEntity.class;
 	}
 	
 	@Override
 	void mergeViews() throws CASException {
+		mergedCas.reset();
 		CasCopier.copyCas(jCas.getCas(), mergedCas.getCas(), true, true);
 		try {
 			DocumentMetaData.get(jCas);

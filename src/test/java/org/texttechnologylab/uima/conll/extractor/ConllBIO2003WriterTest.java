@@ -17,7 +17,7 @@ import org.apache.uima.fit.pipeline.SimplePipeline;
 import org.apache.uima.fit.util.JCasUtil;
 import org.apache.uima.jcas.JCas;
 import org.dkpro.core.io.xmi.XmiReader;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.texttechnologylab.agreement.engine.TTLabUnitizingIAACollectionProcessingEngine;
 import org.texttechnologylab.uima.conll.iobencoder.DKProHierarchicalIobEncoder;
 import org.texttechnologylab.uima.conll.iobencoder.GenericIobEncoder;
@@ -196,8 +196,8 @@ public class ConllBIO2003WriterTest {
 					ConllBIO2003Writer.PARAM_FILTER_EMPTY_SENTENCES, true);
 			
 			CollectionReader reader = CollectionReaderFactory.createReader(XmiReader.class,
+					XmiReader.PARAM_SOURCE_LOCATION, "src/test/resources/",
 					XmiReader.PARAM_PATTERNS, "[+]**.xmi",
-					XmiReader.PARAM_SOURCE_LOCATION, "../Utilities/src/test/out/xmi/",
 					XmiReader.PARAM_LENIENT, true
 			);
 			SimplePipeline.runPipeline(reader, agreementEngine, conllEngine);

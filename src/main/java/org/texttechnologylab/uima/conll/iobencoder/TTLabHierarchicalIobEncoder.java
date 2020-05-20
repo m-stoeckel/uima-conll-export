@@ -42,7 +42,7 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 	 *
 	 * @param jCas The JCas to process.
 	 */
-	public TTLabHierarchicalIobEncoder(JCas jCas) {
+	public TTLabHierarchicalIobEncoder(JCas jCas) throws UIMAException {
 		this(jCas, Lists.newArrayList(NamedEntity.class, AbstractNamedEntity.class), ImmutableSet.of());
 	}
 	
@@ -53,7 +53,7 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 	 * @param jCas         The JCas to process.
 	 * @param annotatorSet
 	 */
-	public TTLabHierarchicalIobEncoder(JCas jCas, ImmutableSet<String> annotatorSet) {
+	public TTLabHierarchicalIobEncoder(JCas jCas, ImmutableSet<String> annotatorSet) throws UIMAException {
 		this(jCas, Lists.newArrayList(NamedEntity.class, AbstractNamedEntity.class), annotatorSet);
 	}
 	
@@ -64,7 +64,7 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 	 * @param includeAnnotations Include all annotations of these classes.
 	 * @param annotatorSet
 	 */
-	public TTLabHierarchicalIobEncoder(JCas jCas, ArrayList<Class<? extends Annotation>> includeAnnotations, ImmutableSet<String> annotatorSet) {
+	public TTLabHierarchicalIobEncoder(JCas jCas, ArrayList<Class<? extends Annotation>> includeAnnotations, ImmutableSet<String> annotatorSet) throws UIMAException {
 		super(jCas, includeAnnotations, annotatorSet);
 		this.type = Annotation.class;
 	}
@@ -140,6 +140,7 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 	
 	@Override
 	void mergeViews() throws CASException {
+		mergedCas.reset();
 		if (!mergeViews) {
 			mergedCas = jCas;
 			return;

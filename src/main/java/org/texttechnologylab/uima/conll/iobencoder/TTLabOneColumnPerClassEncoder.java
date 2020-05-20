@@ -5,7 +5,6 @@ import com.google.common.collect.Lists;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
 import org.apache.uima.UIMAException;
 import org.apache.uima.cas.Type;
-import org.apache.uima.fit.factory.JCasFactory;
 import org.apache.uima.jcas.JCas;
 import org.apache.uima.jcas.tcas.Annotation;
 import org.jetbrains.annotations.NotNull;
@@ -21,24 +20,27 @@ import static org.apache.uima.fit.util.JCasUtil.select;
 
 public class TTLabOneColumnPerClassEncoder extends TTLabHierarchicalIobEncoder {
 	
-	private ArrayList<String> namedEntityTypes = Lists.newArrayList("Act_Action_Activity", "Animal_Fauna",
-			"Archaea", "Artifact", "Attribute_Property", "Bacteria", "Body_Corpus", "Chromista", "Cognition_Ideation",
-			"Communication", "Event_Happening", "Feeling_Emotion", "Food", "Fungi", "Group_Collection", "Habitat",
-			"Lichen", "Location_Place", "Morphology", "Motive", "NaturalObject", "NaturalPhenomenon",
-			"Person_HumanBeing", "Plant_Flora", "Possession_Property", "Process", "Protozoa", "Quantity_Amount",
-			"Relation", "Reproduction", "Shape", "Society", "State_Condition", "Substance", "Taxon", "Time", "Viruses");
+	private ArrayList<String> namedEntityTypes = Lists.newArrayList("Animal_Fauna",
+			"Archaea", "Bacteria", "Chromista", "Fungi", "Habitat", "Lichen", "Plant_Flora", "Protozoa", "Taxon",
+			"Viruses");
+	//		private ArrayList<String> namedEntityTypes = Lists.newArrayList("Act_Action_Activity", "Animal_Fauna",
+//			"Archaea", "Artifact", "Attribute_Property", "Bacteria", "Body_Corpus", "Chromista", "Cognition_Ideation",
+//			"Communication", "Event_Happening", "Feeling_Emotion", "Food", "Fungi", "Group_Collection", "Habitat",
+//			"Lichen", "Location_Place", "Morphology", "Motive", "NaturalObject", "NaturalPhenomenon",
+//			"Person_HumanBeing", "Plant_Flora", "Possession_Property", "Process", "Protozoa", "Quantity_Amount",
+//			"Relation", "Reproduction", "Shape", "Society", "State_Condition", "Substance", "Taxon", "Time", "Viruses");
 	private ArrayList<String> presentNamedEntityTypes = namedEntityTypes;
 	private LinkedHashSet<Annotation> namedEntities;
 	
-	public TTLabOneColumnPerClassEncoder(JCas jCas) {
+	public TTLabOneColumnPerClassEncoder(JCas jCas) throws UIMAException {
 		super(jCas);
 	}
 	
-	public TTLabOneColumnPerClassEncoder(JCas jCas, ImmutableSet<String> annotatorSet) {
+	public TTLabOneColumnPerClassEncoder(JCas jCas, ImmutableSet<String> annotatorSet) throws UIMAException {
 		super(jCas, annotatorSet);
 	}
 	
-	public TTLabOneColumnPerClassEncoder(JCas jCas, ArrayList<Class<? extends Annotation>> includeAnnotations, ImmutableSet<String> annotatorSet) {
+	public TTLabOneColumnPerClassEncoder(JCas jCas, ArrayList<Class<? extends Annotation>> includeAnnotations, ImmutableSet<String> annotatorSet) throws UIMAException {
 		super(jCas, includeAnnotations, annotatorSet);
 	}
 	
@@ -85,7 +87,9 @@ public class TTLabOneColumnPerClassEncoder extends TTLabHierarchicalIobEncoder {
 			
 			getLogger().info("Populating hierarchy");
 			for (Annotation namedEntity : namedEntities) {
-				final int index = presentNamedEntityTypes.indexOf(namedEntity.getType().getShortName());
+				int index = presentNamedEntityTypes.indexOf(namedEntity.getType().getShortName());
+				if (index < 0)
+					continue;
 				for (Token coveredToken : tokenNeIndex.get(namedEntity)) {
 					hierachialTokenNamedEntityMap.get(coveredToken).set(index, getConllFeatures(namedEntity, coveredToken));
 				}
