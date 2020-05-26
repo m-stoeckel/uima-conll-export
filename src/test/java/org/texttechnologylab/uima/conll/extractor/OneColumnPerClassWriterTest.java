@@ -162,7 +162,7 @@ public class OneColumnPerClassWriterTest {
 			
 			final AnalysisEngine conllEngine = AnalysisEngineFactory.createEngine(
 					OneClassPerColumnWriter.class,
-					OneClassPerColumnWriter.PARAM_TARGET_LOCATION, "src/test/resources/out/",
+					OneClassPerColumnWriter.PARAM_TARGET_LOCATION, "/home/manu/Work/data/conll/annotated/",
 					OneClassPerColumnWriter.PARAM_OVERWRITE, true,
 					OneClassPerColumnWriter.PARAM_USE_TTLAB_TYPESYSTEM, true,
 					OneClassPerColumnWriter.PARAM_USE_TTLAB_CONLL_FEATURES, false,
@@ -176,8 +176,8 @@ public class OneColumnPerClassWriterTest {
 					OneClassPerColumnWriter.PARAM_FILTER_EMPTY_SENTENCES, true);
 			
 			CollectionReader reader = CollectionReaderFactory.createReader(XmiReader.class,
-					XmiReader.PARAM_SOURCE_LOCATION, "src/test/resources/",
-					XmiReader.PARAM_PATTERNS, "[+]3713524-manual.xmi",
+					XmiReader.PARAM_SOURCE_LOCATION, "/home/manu/Work/Utilities/src/test/out/xmi/",
+					XmiReader.PARAM_PATTERNS, "[+]**.xmi",
 					XmiReader.PARAM_LENIENT, true
 			);
 			SimplePipeline.runPipeline(reader, agreementEngine, conllEngine);

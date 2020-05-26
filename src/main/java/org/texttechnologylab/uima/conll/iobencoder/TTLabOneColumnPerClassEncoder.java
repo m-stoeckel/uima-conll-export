@@ -21,7 +21,9 @@ import static org.apache.uima.fit.util.JCasUtil.select;
 public class TTLabOneColumnPerClassEncoder extends TTLabHierarchicalIobEncoder {
 	
 	private ArrayList<String> namedEntityTypes = Lists.newArrayList("Animal_Fauna",
-			"Archaea", "Bacteria", "Chromista", "Fungi", "Habitat", "Lichen", "Plant_Flora", "Protozoa", "Taxon",
+			"Archaea", "Bacteria", "Chromista", "Fungi",
+//			"Habitat",
+			"Lichen", "Plant_Flora", "Protozoa", "Taxon",
 			"Viruses");
 	//		private ArrayList<String> namedEntityTypes = Lists.newArrayList("Act_Action_Activity", "Animal_Fauna",
 //			"Archaea", "Artifact", "Attribute_Property", "Bacteria", "Body_Corpus", "Chromista", "Cognition_Ideation",
@@ -69,11 +71,11 @@ public class TTLabOneColumnPerClassEncoder extends TTLabHierarchicalIobEncoder {
 			
 			// Flatten the new view by removing identical duplicates
 			if (removeDuplicateSameType) {
-				getLogger().info("Removing duplicates");
+				getLogger().debug("Removing duplicates");
 				removeDuplicates(namedEntities);
 			}
 			
-			getLogger().info("Initializing hierarchy");
+			getLogger().debug("Initializing hierarchy");
 			// Create an empty list for all layers of NEs for each Token
 			ArrayList<Token> tokens = new ArrayList<>(select(mergedCas, Token.class));
 			for (int i = 0; i < tokens.size(); i++) {
@@ -82,10 +84,10 @@ public class TTLabOneColumnPerClassEncoder extends TTLabHierarchicalIobEncoder {
 				hierachialTokenNamedEntityMap.put(token, getEmptyConllFeatureList());
 			}
 			
-			getLogger().info("Building indices");
+			getLogger().debug("Building indices");
 			Map<Annotation, Collection<Token>> tokenNeIndex = indexCovered(mergedCas, Annotation.class, Token.class);
 			
-			getLogger().info("Populating hierarchy");
+			getLogger().debug("Populating hierarchy");
 			for (Annotation namedEntity : namedEntities) {
 				int index = presentNamedEntityTypes.indexOf(namedEntity.getType().getShortName());
 				if (index < 0)

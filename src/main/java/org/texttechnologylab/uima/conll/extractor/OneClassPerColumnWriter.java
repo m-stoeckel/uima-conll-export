@@ -6,6 +6,7 @@ import de.tudarmstadt.ukp.dkpro.core.api.lexmorph.type.pos.POS;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Lemma;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.uima.UIMAException;
 import org.apache.uima.fit.util.JCasUtil;
 import org.apache.uima.jcas.JCas;
@@ -70,7 +71,8 @@ public class OneClassPerColumnWriter extends ConllBIO2003Writer {
 						entityCount += row.entities.stream().filter(s -> !s.equals("O")).count();
 					}
 					
-					ctokens.put(row.token, row);
+					if (StringUtils.isNotEmpty(row.token.getCoveredText().trim()))
+						ctokens.put(row.token, row);
 				}
 				
 				// Check for empty sentences if parameter was set
@@ -94,7 +96,7 @@ public class OneClassPerColumnWriter extends ConllBIO2003Writer {
 							namedEntityFeatures = neBuilder.toString();
 						}
 						
-						conllWriter.printf("%s%s%s%s%s%s%s%n", row.token.getCoveredText(), pConllSeparator, pos, pConllSeparator, lemma, pConllSeparator, namedEntityFeatures);
+						conllWriter.printf("%s%s%s%s%s%s%s%n", row.token.getCoveredText().trim(), pConllSeparator, pos, pConllSeparator, lemma, pConllSeparator, namedEntityFeatures);
 					}
 					conllWriter.println();
 				} else {
@@ -103,9 +105,9 @@ public class OneClassPerColumnWriter extends ConllBIO2003Writer {
 				totalEntityCount += entityCount;
 			}
 			if (emptySentences > 0) {
-				getLogger().info(String.format("Skipped %d empty sentences.", emptySentences));
+				getLogger().debug(String.format("Skipped %d empty sentences.", emptySentences));
 			}
-			getLogger().info(String.format("Wrote file with %d tags.", totalEntityCount));
+			getLogger().debug(String.format("Wrote file with %d tags.", totalEntityCount));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
