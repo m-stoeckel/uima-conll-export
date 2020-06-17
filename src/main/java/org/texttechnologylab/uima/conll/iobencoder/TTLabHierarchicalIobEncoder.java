@@ -7,6 +7,7 @@ import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.uima.UIMAException;
 import org.apache.uima.cas.CASException;
+import org.apache.uima.cas.Type;
 import org.apache.uima.fit.factory.JCasFactory;
 import org.apache.uima.fit.util.JCasUtil;
 import org.apache.uima.jcas.JCas;
@@ -145,7 +146,7 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 			mergedCas = jCas;
 			return;
 		}
-		getLogger().info("Merging views");
+		getLogger().debug("Merging views");
 		
 		CasCopier.copyCas(jCas.getCas(), mergedCas.getCas(), true, true);
 		mergedCas.removeAllIncludingSubtypes(NamedEntity.type);
@@ -168,7 +169,7 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 				for (NamedEntity oNamedEntity : select(viewCas, NamedEntity.class)) {
 					if (!entityClassIsIncluded(oNamedEntity) || !fingerprinted.contains(oNamedEntity)) continue;
 					
-					NamedEntity nNamedEntity = (NamedEntity) mergedCas.getCas().createAnnotation(oNamedEntity.getType(), oNamedEntity.getBegin(), oNamedEntity.getEnd());
+					NamedEntity nNamedEntity = (NamedEntity) mergedCas.getCas().createAnnotation(getType(oNamedEntity), oNamedEntity.getBegin(), oNamedEntity.getEnd());
 					nNamedEntity.setValue(oNamedEntity.getValue());
 					nNamedEntity.setMetaphor(oNamedEntity.getMetaphor());
 					nNamedEntity.setMetonym(oNamedEntity.getMetonym());
@@ -180,7 +181,7 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 					if (!entityClassIsIncluded(oNamedEntity) || !fingerprinted.contains(oNamedEntity))
 						continue;
 					
-					AbstractNamedEntity nNamedEntity = (AbstractNamedEntity) mergedCas.getCas().createAnnotation(oNamedEntity.getType(), oNamedEntity.getBegin(), oNamedEntity.getEnd());
+					AbstractNamedEntity nNamedEntity = (AbstractNamedEntity) mergedCas.getCas().createAnnotation(getType(oNamedEntity), oNamedEntity.getBegin(), oNamedEntity.getEnd());
 					nNamedEntity.setValue(oNamedEntity.getValue());
 					nNamedEntity.setMetaphor(oNamedEntity.getMetaphor());
 					nNamedEntity.setSpecific(oNamedEntity.getSpecific());
@@ -199,6 +200,10 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 				)
 		);
 		subTokens.forEach(mergedCas::removeFsFromIndexes);
+	}
+	
+	private Type getType(Annotation oNamedEntity) {
+		return oNamedEntity.getType();
 	}
 	
 	

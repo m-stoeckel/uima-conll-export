@@ -13,6 +13,7 @@ import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.output.CloseShieldOutputStream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.uima.UIMAException;
+import org.apache.uima.UimaContext;
 import org.apache.uima.analysis_engine.AnalysisEngineProcessException;
 import org.apache.uima.cas.CASException;
 import org.apache.uima.cas.CASRuntimeException;
@@ -23,6 +24,7 @@ import org.apache.uima.jcas.JCas;
 import org.apache.uima.jcas.cas.DoubleArray;
 import org.apache.uima.jcas.cas.StringArray;
 import org.apache.uima.jcas.tcas.Annotation;
+import org.apache.uima.resource.ResourceInitializationException;
 import org.dkpro.core.api.parameter.ComponentParameters;
 import org.texttechnologylab.iaa.AgreementContainer;
 import org.texttechnologylab.uima.conll.iobencoder.DKProHierarchicalIobEncoder;
@@ -182,7 +184,35 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 	)
 	private Boolean pOnlyPrintPresent;
 	
+	public static final String PARAM_RETAIN_CLASSES = "pRetainClasses";
+	@ConfigurationParameter(name = PARAM_RETAIN_CLASSES, mandatory = false)
+	protected String[] pRetainClasses;
+	protected ArrayList<Class<? extends Annotation>> classesToRetain;
+	
+	public static final String PARAM_TAG_ALL_AS = "pTagAllAs";
+	@ConfigurationParameter(name = PARAM_TAG_ALL_AS, mandatory = false)
+	protected String pTagAllAs;
+	
 	// End of AnalysisComponent parameters
+	
+	
+	@Override
+	public void initialize(UimaContext context) throws ResourceInitializationException {
+		super.initialize(context);
+		if (pRetainClasses != null && pRetainClasses.length > 0) {
+			classesToRetain = new ArrayList<>();
+			for (String retainClass : pRetainClasses) {
+				try {
+					classesToRetain.add((Class<? extends Annotation>) Class.forName(retainClass));
+				} catch (ClassNotFoundException e) {
+					getLogger().error(String.format("Encountered invalid class name '%s' in agreement categories!", retainClass), e);
+				}
+			}
+		} else {
+			classesToRetain = new ArrayList<>();
+			classesToRetain.add(Annotation.class);
+		}
+	}
 	
 	@Override
 	public void process(JCas aJCas) throws AnalysisEngineProcessException {
@@ -251,7 +281,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 	}
 	
 	boolean printWithoutIaaFiltering(JCas aJCas, ImmutableSet<String> validViewNames) throws UIMAException {
-		return printWithIaaFiltering(aJCas, null, validViewNames);
+		return printWithIaaFiltering(aJCas, classesToRetain, validViewNames);
 	}
 	
 	boolean printWithIaaFiltering(JCas aJCas, ArrayList<Class<? extends Annotation>> filteredCategories, ImmutableSet<String> validViewNames) throws UIMAException {
@@ -318,8 +348,9 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 		try (PrintWriter conllWriter = getPrintWriter(aJCas, filenameSuffix)) {
 			
 			int emptySentences = 0;
-			int entityCount = 0;
+			int globalEntityCount = 0;
 			for (Sentence sentence : select(aJCas, Sentence.class)) {
+				int entityCount = 0;
 				HashMap<Token, Row> ctokens = new LinkedHashMap<>();
 				
 				// Tokens
@@ -363,6 +394,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 				
 				// Check for empty sentences if parameter was set
 				if (!pFilterEmptySentences || entityCount > 0) {
+					globalEntityCount += entityCount;
 					// Write sentence in CONLL 2006 format
 					for (Row row : ctokens.values()) {
 						String pos = row.pos;
@@ -382,6 +414,10 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 							namedEntityFeatures = neBuilder.toString();
 						}
 						
+						if (pTagAllAs != null && !pTagAllAs.isEmpty()) {
+							namedEntityFeatures = namedEntityFeatures.replaceAll("-[\\w_]+", "-" + pTagAllAs);
+						}
+						
 						conllWriter.printf("%s%s%s%s%s%s%s%n", row.token.getCoveredText(), pConllSeparator, pos, pConllSeparator, lemma, pConllSeparator, namedEntityFeatures);
 					}
 					conllWriter.println();
@@ -392,7 +428,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 			if (emptySentences > 0) {
 				getLogger().info(String.format("Skipped %d empty sentences.", emptySentences));
 			}
-			getLogger().info(String.format("Wrote file with %d tags.", entityCount));
+			getLogger().info(String.format("Wrote file with %d tags.", globalEntityCount));
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
