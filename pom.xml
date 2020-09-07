@@ -129,9 +129,9 @@
             <version>20190722</version>
         </dependency>
         <dependency>
-            <groupId>com.github.texttechnologylab</groupId>
-            <artifactId>Utilities</artifactId>
-            <version>1.0.7-uima-2.10.4</version>
+            <groupId>org.texttechnologylab</groupId>
+            <artifactId>utilities</artifactId>
+            <version>1.0.9-uima-2.10.4</version>
             <exclusions>
                 <exclusion>
                     <artifactId>commons-collections4</artifactId>
@@ -148,10 +148,6 @@
                 <exclusion>
                     <artifactId>jsr305</artifactId>
                     <groupId>com.google.code.findbugs</groupId>
-                </exclusion>
-                <exclusion>
-                    <artifactId>junit</artifactId>
-                    <groupId>junit</groupId>
                 </exclusion>
             </exclusions>
         </dependency>
@@ -182,6 +178,11 @@
             <version>5.7.0-M1</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>javax.validation</groupId>
+            <artifactId>validation-api</artifactId>
+            <version>1.1.0.Final</version>
+        </dependency>
     </dependencies>
 
 
@@ -198,6 +199,14 @@
             </resource>
         </resources>
         <plugins>
+            <plugin>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>2.22.0</version>
+                <configuration>
+                    <argLine>-Dorg.apache.uima.logger.class=org.texttechnologylab.utilities.uima.util.Log4j2Logger_impl
+                    </argLine>
+                </configuration>
+            </plugin>
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <version>2.6</version>

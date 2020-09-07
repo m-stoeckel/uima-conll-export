@@ -159,8 +159,7 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 		}
 		
 		jCas.getViewIterator().forEachRemaining(viewCas -> {
-			String viewName = StringUtils.substringAfterLast(viewCas.getViewName().trim(), "/");
-			if (annotatorRelation == annotatorSet.contains(viewName)) {
+			if (annotatorRelation == annotatorSet.contains(viewCas.getViewName())) {
 				// Get all fingerprinted TOPs
 				HashSet<TOP> fingerprinted = select(viewCas, Fingerprint.class).stream()
 						.map(Fingerprint::getReference)

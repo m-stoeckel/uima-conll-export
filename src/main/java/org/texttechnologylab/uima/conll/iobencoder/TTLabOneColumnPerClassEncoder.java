@@ -20,10 +20,10 @@ import static org.apache.uima.fit.util.JCasUtil.select;
 
 public class TTLabOneColumnPerClassEncoder extends TTLabHierarchicalIobEncoder {
 	
-	private ArrayList<String> namedEntityTypes = Lists.newArrayList("Animal_Fauna",
-			"Archaea", "Bacteria", "Chromista", "Fungi",
-//			"Habitat",
-			"Lichen", "Plant_Flora", "Protozoa", "Taxon", "Viruses");
+	private ArrayList<String> namedEntityTypes = Lists.newArrayList(
+//			"Animal_Fauna","Archaea", "Bacteria", "Chromista", "Fungi","Lichen", "Plant_Flora", "Protozoa", "Taxon", "Viruses"
+			"Act_Action_Activity", "Animal_Fauna", "Archaea", "Artifact", "Attribute_Property", "Bacteria", "Body_Corpus", "Chromista", "Cognition_Ideation", "Communication", "Event_Happening", "Feeling_Emotion", "Food", "Fungi", "Group_Collection", "Habitat", "Location_Place", "Morphology", "Motive", "NaturalObject", "NaturalPhenomenon", "Person_HumanBeing", "Plant_Flora", "Possession_Property", "Process", "Protozoa", "Quantity_Amount", "Relation", "Reproduction", "Shape", "Society", "State_Condition", "Substance", "Taxon", "Time", "Viruses"
+	);
 	private ArrayList<String> presentNamedEntityTypes = namedEntityTypes;
 	private LinkedHashSet<Annotation> namedEntities;
 	
