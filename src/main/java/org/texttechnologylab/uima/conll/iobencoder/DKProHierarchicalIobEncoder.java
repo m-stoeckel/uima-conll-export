@@ -5,7 +5,6 @@ import com.google.common.collect.Lists;
 import de.tudarmstadt.ukp.dkpro.core.api.metadata.type.DocumentMetaData;
 import de.tudarmstadt.ukp.dkpro.core.api.ner.type.NamedEntity;
 import org.apache.commons.collections4.bidimap.DualLinkedHashBidiMap;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.uima.UIMAException;
 import org.apache.uima.cas.CASException;
 import org.apache.uima.jcas.JCas;
@@ -64,7 +63,7 @@ public class DKProHierarchicalIobEncoder extends GenericIobEncoder<NamedEntity> 
 		}
 		
 		jCas.getViewIterator().forEachRemaining(viewCas -> {
-			if (annotatorRelation == annotatorSet.contains(viewCas.getViewName())) {
+			if (annotatorSet.contains(viewCas.getViewName())) {
 				DualLinkedHashBidiMap<TOP, TOP> addressMap = new DualLinkedHashBidiMap<>();
 				for (Annotation oAnnotation : select(viewCas, NamedEntity.class)) {
 					Annotation nAnnotation = (Annotation) mergedCas.getCas().createAnnotation(oAnnotation.getType(), oAnnotation.getBegin(), oAnnotation.getEnd());

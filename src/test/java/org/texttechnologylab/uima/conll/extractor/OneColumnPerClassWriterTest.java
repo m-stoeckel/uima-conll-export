@@ -146,13 +146,13 @@ public class OneColumnPerClassWriterTest {
 	public void exampleFile() {
 		try {
 			String[] annotatorWhitelist = {"306229", "306299", "305236", "305235", "302902", "306614"};
-			String[] annotatorBlacklist = {"0", "302904", "303228", "306320", "305718", "306513"};
+			String[] annotatorBlacklist = {"0"};
 			final AnalysisEngine agreementEngine = AnalysisEngineFactory.createEngine(
 					TTLabUnitizingIAACollectionProcessingEngine.class,
-					PARAM_ANNOTATOR_RELATION, WHITELIST,
-					PARAM_ANNOTATOR_LIST, annotatorWhitelist,
-//					PARAM_ANNOTATOR_RELATION, BLACKLIST,
-//					PARAM_ANNOTATOR_LIST, annotatorBlacklist,
+//					PARAM_ANNOTATOR_RELATION, WHITELIST,
+//					PARAM_ANNOTATOR_LIST, annotatorWhitelist,
+					PARAM_ANNOTATOR_RELATION, BLACKLIST,
+					PARAM_ANNOTATOR_LIST, annotatorBlacklist,
 					PARAM_MULTI_CAS_HANDLING, SEPARATE,
 					PARAM_PRINT_STATS, false,
 					PARAM_MIN_VIEWS, 1,
@@ -167,10 +167,10 @@ public class OneColumnPerClassWriterTest {
 					OneClassPerColumnWriter.PARAM_USE_TTLAB_TYPESYSTEM, true,
 					OneClassPerColumnWriter.PARAM_USE_TTLAB_CONLL_FEATURES, false,
 					OneClassPerColumnWriter.PARAM_FILTER_FINGERPRINTED, false,
-					OneClassPerColumnWriter.PARAM_ANNOTATOR_RELATION, OneClassPerColumnWriter.WHITELIST,
-					OneClassPerColumnWriter.PARAM_ANNOTATOR_LIST, annotatorWhitelist,
-//					OneClassPerColumnWriter.PARAM_ANNOTATOR_RELATION, OneClassPerColumnWriter.BLACKLIST,
-//					OneClassPerColumnWriter.PARAM_ANNOTATOR_LIST, annotatorBlacklist,
+//					OneClassPerColumnWriter.PARAM_ANNOTATOR_RELATION, OneClassPerColumnWriter.WHITELIST,
+//					OneClassPerColumnWriter.PARAM_ANNOTATOR_LIST, annotatorWhitelist,
+					OneClassPerColumnWriter.PARAM_ANNOTATOR_RELATION, OneClassPerColumnWriter.BLACKLIST,
+					OneClassPerColumnWriter.PARAM_ANNOTATOR_LIST, annotatorBlacklist,
 					OneClassPerColumnWriter.PARAM_MIN_VIEWS, 1,
 //					OneClassPerColumnWriter.PARAM_FILTER_BY_AGREEMENT, 0.6F,
 					OneClassPerColumnWriter.PARAM_FILTER_EMPTY_SENTENCES, true);

@@ -26,6 +26,7 @@ import org.apache.uima.jcas.cas.StringArray;
 import org.apache.uima.jcas.tcas.Annotation;
 import org.apache.uima.resource.ResourceInitializationException;
 import org.dkpro.core.api.parameter.ComponentParameters;
+import org.texttechnologylab.annotation.administration.FinishAnnotation;
 import org.texttechnologylab.iaa.AgreementContainer;
 import org.texttechnologylab.uima.conll.iobencoder.DKProHierarchicalIobEncoder;
 import org.texttechnologylab.uima.conll.iobencoder.GenericIobEncoder;
@@ -37,6 +38,7 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static org.apache.uima.fit.util.JCasUtil.select;
@@ -192,6 +194,12 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 	public static final String PARAM_TAG_ALL_AS = "pTagAllAs";
 	@ConfigurationParameter(name = PARAM_TAG_ALL_AS, mandatory = false)
 	protected String pTagAllAs;
+	
+	public static final String PARAM_FILTER_FINISHED = "pFilterFinishedViews";
+	@ConfigurationParameter(name = PARAM_FILTER_FINISHED, defaultValue = "true", mandatory = false,
+			description = "Set false to disable finished view check. Default value: true."
+	)
+	boolean pFilterFinishedViews;
 	
 	// End of AnalysisComponent parameters
 	
@@ -440,6 +448,7 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 	
 	private ImmutableSet<String> getValidViewNames(JCas aJCas) throws CASException {
 		LinkedHashSet<String> validViewNames = Streams.stream(aJCas.getViewIterator())
+				.filter(this::isViewFinished)
 				.map(JCas::getViewName)
 				.filter(fullName -> {
 					// If whitelisting (true), the name must be in the set; if blacklisting (false), it must not be in the set
@@ -448,6 +457,15 @@ public class ConllBIO2003Writer extends JCasAnnotator_ImplBase {
 				})
 				.collect(Collectors.toCollection(LinkedHashSet::new));
 		return ImmutableSet.copyOf(validViewNames);
+	}
+	
+	private boolean isViewFinished(JCas viewCas) {
+		String viewName = StringUtils.substringAfterLast(viewCas.getViewName().trim(), "/");
+		viewName = viewName.isEmpty() ? viewCas.getViewName().trim() : viewName;
+		return !pFilterFinishedViews || JCasUtil.select(viewCas, FinishAnnotation.class).stream()
+				.map(FinishAnnotation::getUser)
+				.map(fullName -> StringUtils.substringAfterLast(fullName.trim(), "/"))
+				.anyMatch(Predicate.isEqual(viewName));
 	}
 	
 	@NotNull

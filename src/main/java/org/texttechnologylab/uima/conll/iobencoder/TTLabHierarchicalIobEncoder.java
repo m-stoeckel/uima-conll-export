@@ -4,7 +4,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import de.tudarmstadt.ukp.dkpro.core.api.metadata.type.DocumentMetaData;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.uima.UIMAException;
 import org.apache.uima.cas.CASException;
 import org.apache.uima.cas.Type;
@@ -159,7 +158,7 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 		}
 		
 		jCas.getViewIterator().forEachRemaining(viewCas -> {
-			if (annotatorRelation == annotatorSet.contains(viewCas.getViewName())) {
+			if (annotatorSet.contains(viewCas.getViewName())) {
 				// Get all fingerprinted TOPs
 				HashSet<TOP> fingerprinted = select(viewCas, Fingerprint.class).stream()
 						.map(Fingerprint::getReference)
@@ -355,7 +354,7 @@ public class TTLabHierarchicalIobEncoder extends GenericIobEncoder<Annotation> {
 		this.useTTLabConllFeatures = useTTLabConllFeatures;
 	}
 	
-	public void setMergeViews(boolean mergeViews){
+	public void setMergeViews(boolean mergeViews) {
 		this.mergeViews = mergeViews;
 	}
 	

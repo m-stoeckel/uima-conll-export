@@ -3,7 +3,6 @@ package org.texttechnologylab.uima.conll.iobencoder;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.log4j.Logger;
 import org.apache.uima.UIMAException;
 import org.apache.uima.cas.CASException;
@@ -216,7 +215,7 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 		CasCopier.copyCas(jCas.getCas(), mergedCas.getCas(), true, true);
 		
 		jCas.getViewIterator().forEachRemaining(viewCas -> {
-			if (annotatorRelation == annotatorSet.contains(viewCas.getViewName())) {
+			if (annotatorSet.contains(viewCas.getViewName())) {
 				// Get all fingerprinted TOPs
 				HashSet<TOP> fingerprinted = select(viewCas, Fingerprint.class).stream()
 						.map(Fingerprint::getReference)
@@ -583,6 +582,7 @@ public abstract class GenericIobEncoder<T extends Annotation> {
 		}
 		
 	}
+	
 	public void setFilterFingerprinted(boolean filterFingerprinted) {
 		this.filterFingerprinted = filterFingerprinted;
 	}
